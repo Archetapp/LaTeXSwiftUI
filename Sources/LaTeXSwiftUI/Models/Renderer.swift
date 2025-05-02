@@ -408,7 +408,7 @@ extension Renderer {
     
     // Check the cache for an image
     if let image = Cache.shared.imageCacheValue(for: cacheKey) {
-      return Image(image: image)
+      return Image(image: image, scale: displayScale)
         .renderingMode(renderingMode)
         .antialiased(true)
         .interpolation(.high)
@@ -416,17 +416,42 @@ extension Renderer {
     
     // Continue with getting the image
     let imageSize = svg.size(for: xHeight)
+    
     #if os(iOS) || os(visionOS)
     guard let image = SwiftDraw.SVG(data: svg.data)?.rasterize(size: imageSize, scale: displayScale) else {
       return nil
     }
     #else
-    guard let image = SwiftDraw.SVG(data: svg.data)?.rasterize(with: imageSize, scale: displayScale) else {
+    // On macOS, we need to ensure the image is created with consistent dimensions
+    guard let svgInstance = SwiftDraw.SVG(data: svg.data) else {
       return nil
     }
+    
+    let scale = max(1.0, displayScale)
+    // Use explicit size and ensure consistent scaling
+    let image = svgInstance.rasterize(with: imageSize, scale: scale)
+    
+    // If the image has zero size, try again with default size
+    if image.size.width == 0 || image.size.height == 0 {
+      // Fallback to a more reliable size calculation
+      let fallbackSize = CGSize(width: max(1, imageSize.width), height: max(1, imageSize.height))
+      let fallbackImage = svgInstance.rasterize(with: fallbackSize, scale: scale)
+      
+      // Set the image in the cache
+      Cache.shared.setImageCacheValue(fallbackImage, for: cacheKey)
+      
+      return Image(image: fallbackImage, scale: scale)
+        .renderingMode(renderingMode)
+        .antialiased(true)
+        .interpolation(.high)
+    }
+    
+    // No need to unwrap since NSImage is non-optional on macOS
+    let finalImage = image
     #endif
     
-    // Set the image in the cache
+    // Set the image in the cache - use platform-specific variables
+    #if os(iOS) || os(visionOS)
     Cache.shared.setImageCacheValue(image, for: cacheKey)
     
     // Finish up
@@ -434,6 +459,14 @@ extension Renderer {
       .renderingMode(renderingMode)
       .antialiased(true)
       .interpolation(.high)
+    #else
+    Cache.shared.setImageCacheValue(finalImage, for: cacheKey)
+    
+    return Image(image: finalImage, scale: scale)
+      .renderingMode(renderingMode)
+      .antialiased(true)
+      .interpolation(.high)
+    #endif
   }
   
   /// Gets the error text from a possibly non-nil error.

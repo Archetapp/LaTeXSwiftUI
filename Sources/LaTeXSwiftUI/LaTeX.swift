@@ -214,6 +214,11 @@ public struct LaTeX: View {
     }
     .animation(renderingAnimation, value: renderer.rendered)
     .onDisappear(perform: preloadTask?.cancel)
+    // Add platform-specific modifiers for better rendering stability
+    #if os(macOS)
+    .fixedSize(horizontal: false, vertical: true) // Help stabilize vertical height on macOS
+    .layoutPriority(1) // Give LaTeX views layout priority
+    #endif
   }
   
 }
