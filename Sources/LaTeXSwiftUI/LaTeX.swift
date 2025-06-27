@@ -257,6 +257,23 @@ extension LaTeX {
   }
 #endif
   
+  /// Clears all LaTeX rendering caches.
+  ///
+  /// This method completely clears both the SVG data cache and the rendered
+  /// image cache. Use this if you're experiencing rendering issues or want
+  /// to free up memory.
+  public static func clearAllCaches() {
+    Cache.shared.clearAllCaches()
+  }
+  
+  /// Returns the current number of consecutive rendering failures.
+  ///
+  /// This can be useful for debugging rendering issues. The caches will
+  /// automatically clear when this reaches the threshold (currently 3).
+  public static var consecutiveRenderingFailures: Int {
+    Cache.shared.consecutiveFailures
+  }
+  
 }
 
 // MARK: Private methods

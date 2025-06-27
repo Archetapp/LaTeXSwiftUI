@@ -177,4 +177,17 @@ public extension View {
     environment(\.platformFont, font)
   }
   
+  /// Clears all LaTeX rendering caches.
+  ///
+  /// This method completely clears both the SVG data cache and the rendered
+  /// image cache. Use this if you're experiencing rendering issues or want
+  /// to free up memory. This is a convenience method that calls
+  /// `LaTeX.clearAllCaches()`.
+  ///
+  /// - Returns: The view unchanged.
+  func clearLaTeXCaches() -> some View {
+    LaTeX.clearAllCaches()
+    return self
+  }
+  
 }

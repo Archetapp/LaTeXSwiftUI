@@ -27,7 +27,7 @@ import CryptoKit
 import Foundation
 import MathJaxSwift
 
-fileprivate protocol CacheKey: Codable {
+internal protocol CacheKey: Codable {
   
   /// The key type used to identify the cache key in storage.
   static var keyType: String { get }
@@ -40,7 +40,7 @@ fileprivate protocol CacheKey: Codable {
 extension CacheKey {
   
   /// The key to use in the cache.
-  func key() -> String {
+  internal func key() -> String {
     do {
       let data = try JSONEncoder().encode(self)
       let hashedData = SHA256.hash(data: data)
@@ -95,6 +95,13 @@ internal class Cache {
   /// The image cache queue.
   private let imageCacheQueue = DispatchQueue(label: "latexswiftui.cache.image")
   
+  /// Counter for consecutive rendering failures.
+  private var _consecutiveFailures: Int = 0
+  private let failureCountQueue = DispatchQueue(label: "latexswiftui.cache.failures")
+  
+  /// The maximum number of consecutive failures before clearing caches.
+  private let maxConsecutiveFailures = 3
+  
 }
 
 // MARK: Public methods
@@ -144,6 +151,60 @@ extension Cache {
     imageCacheQueue.async(flags: .barrier) { [weak self] in
       guard let self = self else { return }
       self.imageCache.setObject(value, forKey: key.key() as NSString)
+    }
+  }
+  
+  /// Completely clears both caches.
+  func clearAllCaches() {
+    dataCacheQueue.async(flags: .barrier) { [weak self] in
+      guard let self = self else { return }
+      self.dataCache.removeAllObjects()
+    }
+    
+    imageCacheQueue.async(flags: .barrier) { [weak self] in
+      guard let self = self else { return }
+      self.imageCache.removeAllObjects()
+    }
+    
+    resetFailureCount()
+    NSLog("LaTeXSwiftUI: Cleared all caches due to rendering issues")
+  }
+  
+  /// Records a rendering failure and clears caches if threshold is reached.
+  ///
+  /// - Returns: Whether caches were cleared due to consecutive failures.
+  func recordRenderingFailure() -> Bool {
+    return failureCountQueue.sync { [weak self] in
+      guard let self = self else { return false }
+      self._consecutiveFailures += 1
+      
+      if self._consecutiveFailures >= self.maxConsecutiveFailures {
+        DispatchQueue.global(qos: .utility).async { [weak self] in
+          self?.clearAllCaches()
+        }
+        return true
+      }
+      return false
+    }
+  }
+  
+  /// Records a successful rendering operation.
+  func recordRenderingSuccess() {
+    resetFailureCount()
+  }
+  
+  /// Resets the consecutive failure counter.
+  private func resetFailureCount() {
+    failureCountQueue.async(flags: .barrier) { [weak self] in
+      guard let self = self else { return }
+      self._consecutiveFailures = 0
+    }
+  }
+  
+  /// Gets the current consecutive failure count.
+  var consecutiveFailures: Int {
+    return failureCountQueue.sync { [weak self] in
+      return self?._consecutiveFailures ?? 0
     }
   }
   
