@@ -176,5 +176,13 @@ public extension View {
   internal func platformFont(_ font: _Font? = nil) -> some View {
     environment(\.platformFont, font)
   }
-  
+
+  /// Sets the alignment for block equations.
+  ///
+  /// - Parameter alignment: The block alignment to use.
+  /// - Returns: A view that applies the alignment to block equations.
+  func blockAlignment(_ alignment: LaTeX.BlockAlignment) -> some View {
+    environment(\.blockAlignment, alignment)
+  }
+
 }

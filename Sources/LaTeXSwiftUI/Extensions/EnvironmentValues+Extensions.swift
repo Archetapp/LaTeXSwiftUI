@@ -82,6 +82,10 @@ private struct PlatformFontKey: EnvironmentKey {
   static let defaultValue: _Font? = nil
 }
 
+private struct BlockAlignmentKey: EnvironmentKey {
+  static let defaultValue: LaTeX.BlockAlignment = .leading
+}
+
 extension EnvironmentValues {
   
   /// The image rendering mode of this environment.
@@ -167,5 +171,11 @@ extension EnvironmentValues {
     get { self[PlatformFontKey.self] }
     set { self[PlatformFontKey.self] = newValue }
   }
-  
+
+  /// The block alignment of this environment.
+  var blockAlignment: LaTeX.BlockAlignment {
+    get { self[BlockAlignmentKey.self] }
+    set { self[BlockAlignmentKey.self] = newValue }
+  }
+
 }

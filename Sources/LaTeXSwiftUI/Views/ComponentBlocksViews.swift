@@ -56,16 +56,19 @@ internal struct ComponentBlocksViews: View {
   
   /// Whether string formatting such as markdown should be ignored or rendered.
   @Environment(\.ignoreStringFormatting) private var ignoreStringFormatting
-  
+
+  /// The block alignment to use.
+  @Environment(\.blockAlignment) private var blockAlignment
+
   // MARK: View body
-  
+
   var body: some View {
     VStack(alignment: .leading, spacing: lineSpacing + 4) {
       ForEach(blocks, id: \.self) { block in
         if block.isEquationBlock, let container = block.container, let svg = block.svg {
           HStack(spacing: 0) {
             EquationNumber(blockIndex: blocks.filter({ $0.isEquationBlock }).firstIndex(of: block) ?? 0, side: .left)
-            
+
             if let errorText = svg.errorText, errorMode != .rendered {
               switch errorMode {
               case .error:
@@ -81,9 +84,10 @@ internal struct ComponentBlocksViews: View {
                 image: container.image,
                 height: container.size.size.height)
             }
-            
+
             EquationNumber(blockIndex: blocks.filter({ $0.isEquationBlock }).firstIndex(of: block) ?? 0, side: .right)
           }
+          .frame(maxWidth: .infinity, alignment: frameAlignment)
         }
         else {
           block.toText(
@@ -97,7 +101,29 @@ internal struct ComponentBlocksViews: View {
       }
     }
   }
-  
+
+  private var swiftUIAlignment: HorizontalAlignment {
+    switch blockAlignment {
+    case .leading:
+      return .leading
+    case .center:
+      return .center
+    case .trailing:
+      return .trailing
+    }
+  }
+
+  private var frameAlignment: Alignment {
+    switch blockAlignment {
+    case .leading:
+      return .leading
+    case .center:
+      return .center
+    case .trailing:
+      return .trailing
+    }
+  }
+
 }
 
 struct ComponentBlocksViewsPreviews: PreviewProvider {

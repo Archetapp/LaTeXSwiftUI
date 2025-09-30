@@ -88,10 +88,10 @@ public struct LaTeX: View {
   
   /// The view's rendering style.
   public enum RenderingStyle {
-    
+
     /// The view remains empty until its finished rendering.
     case empty
-    
+
     /// The view displays the input text until it's finished rendering.
     case original
 
@@ -101,9 +101,22 @@ public struct LaTeX: View {
 
     /// The view displays a progress view until it's finished rendering.
     case progress
-    
+
     /// The view blocks on the main thread until it's finished rendering.
     case wait
+  }
+
+  /// The view's block alignment.
+  public enum BlockAlignment {
+
+    /// Block equations are aligned to the leading edge.
+    case leading
+
+    /// Block equations are centered.
+    case center
+
+    /// Block equations are aligned to the trailing edge.
+    case trailing
   }
   
   // MARK: Static properties
