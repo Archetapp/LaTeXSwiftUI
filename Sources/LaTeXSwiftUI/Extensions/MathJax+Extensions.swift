@@ -27,7 +27,7 @@ import Foundation
 import MathJaxSwift
 
 internal extension MathJax {
-  
+
   static var svgRenderer: MathJax? = {
     do {
       return try MathJax(preferredOutputFormat: .svg)
@@ -37,5 +37,8 @@ internal extension MathJax {
       return nil
     }
   }()
-  
+
+  /// Serial queue for synchronizing MathJax operations
+  static let renderQueue = DispatchQueue(label: "com.latexswiftui.mathjax", qos: .userInitiated)
+
 }

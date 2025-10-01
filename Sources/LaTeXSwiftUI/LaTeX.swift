@@ -181,7 +181,13 @@ public struct LaTeX: View {
   
   /// The view's UI/NSFont font.
   @Environment(\.platformFont) private var platformFont
-  
+
+  /// Fixed xHeight value for consistent rendering.
+  @Environment(\.fixedXHeight) private var fixedXHeight
+
+  /// Fixed displayScale value for consistent rendering.
+  @Environment(\.fixedDisplayScale) private var fixedDisplayScale
+
   // MARK: Private properties
   
   /// The view's renderer.
@@ -279,26 +285,30 @@ extension LaTeX {
   /// - Returns: A boolean indicating whether the components to the view are
   ///   cached.
   private func isCached() -> Bool {
-    renderer.isCached(
+    let xHeight = fixedXHeight ?? (platformFont?.xHeight ?? font?.xHeight) ?? Font.body.xHeight
+    let scale = fixedDisplayScale ?? displayScale
+    return renderer.isCached(
       latex: latex,
       unencodeHTML: unencodeHTML,
       parsingMode: parsingMode,
       processEscapes: processEscapes,
       errorMode: errorMode,
-      xHeight: (platformFont?.xHeight ?? font?.xHeight) ?? Font.body.xHeight,
-      displayScale: displayScale)
+      xHeight: xHeight,
+      displayScale: scale)
   }
   
   /// Renders the view's components.
   private func renderAsync() async {
+    let xHeight = fixedXHeight ?? (platformFont?.xHeight ?? font?.xHeight) ?? Font.body.xHeight
+    let scale = fixedDisplayScale ?? displayScale
     await renderer.render(
       latex: latex,
       unencodeHTML: unencodeHTML,
       parsingMode: parsingMode,
       processEscapes: processEscapes,
       errorMode: errorMode,
-      xHeight: (platformFont?.xHeight ?? font?.xHeight) ?? Font.body.xHeight,
-      displayScale: displayScale,
+      xHeight: xHeight,
+      displayScale: scale,
       renderingMode: imageRenderingMode)
   }
   
@@ -306,14 +316,21 @@ extension LaTeX {
   ///
   /// - Returns: The rendered components.
   private func renderSync() -> [ComponentBlock] {
-    renderer.renderSync(
+    let xHeight = fixedXHeight ?? (platformFont?.xHeight ?? font?.xHeight) ?? Font.body.xHeight
+    let scale = fixedDisplayScale ?? displayScale
+
+    #if DEBUG && os(macOS)
+    NSLog("LaTeX.renderSync called with xHeight:\(xHeight) scale:\(scale) latex:'\(latex.prefix(50))'")
+    #endif
+
+    return renderer.renderSync(
       latex: latex,
       unencodeHTML: unencodeHTML,
       parsingMode: parsingMode,
       processEscapes: processEscapes,
       errorMode: errorMode,
-      xHeight: (platformFont?.xHeight ?? font?.xHeight) ?? Font.body.xHeight,
-      displayScale: displayScale,
+      xHeight: xHeight,
+      displayScale: scale,
       renderingMode: imageRenderingMode)
   }
   

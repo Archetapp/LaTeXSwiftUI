@@ -364,19 +364,25 @@ extension Renderer {
     guard let mathjax = MathJax.svgRenderer else {
       return nil
     }
-    
-    // Perform the TeX -> SVG conversion
+
+    // Perform the TeX -> SVG conversion with synchronization
     var conversionError: Error?
-    let svgString = mathjax.tex2svg(
-      component.text,
-      styles: false,
-      conversionOptions: component.conversionOptions,
-      inputOptions: texOptions,
-      error: &conversionError)
-    
+    let svgString = MathJax.renderQueue.sync {
+      mathjax.tex2svg(
+        component.text,
+        styles: false,
+        conversionOptions: component.conversionOptions,
+        inputOptions: texOptions,
+        error: &conversionError)
+    }
+
+    #if DEBUG && os(macOS)
+    NSLog("MathJax rendered '\(component.text)' (display:\(component.conversionOptions.display)) -> SVG length: \(svgString.count)")
+    #endif
+
     // Check for a conversion error
     let errorText = try getErrorText(from: conversionError)
-    
+
     // Create the SVG
     let svg = try SVG(svgString: svgString, errorText: errorText)
     

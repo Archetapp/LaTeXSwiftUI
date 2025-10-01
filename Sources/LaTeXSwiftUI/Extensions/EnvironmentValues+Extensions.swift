@@ -86,6 +86,14 @@ private struct BlockAlignmentKey: EnvironmentKey {
   static let defaultValue: LaTeX.BlockAlignment = .leading
 }
 
+private struct FixedXHeightKey: EnvironmentKey {
+  static let defaultValue: CGFloat? = nil
+}
+
+private struct FixedDisplayScaleKey: EnvironmentKey {
+  static let defaultValue: CGFloat? = nil
+}
+
 extension EnvironmentValues {
   
   /// The image rendering mode of this environment.
@@ -176,6 +184,18 @@ extension EnvironmentValues {
   var blockAlignment: LaTeX.BlockAlignment {
     get { self[BlockAlignmentKey.self] }
     set { self[BlockAlignmentKey.self] = newValue }
+  }
+
+  /// A fixed xHeight value to use for rendering, overriding font-based calculation.
+  var fixedXHeight: CGFloat? {
+    get { self[FixedXHeightKey.self] }
+    set { self[FixedXHeightKey.self] = newValue }
+  }
+
+  /// A fixed displayScale value to use for rendering, overriding environment-based calculation.
+  var fixedDisplayScale: CGFloat? {
+    get { self[FixedDisplayScaleKey.self] }
+    set { self[FixedDisplayScaleKey.self] = newValue }
   }
 
 }

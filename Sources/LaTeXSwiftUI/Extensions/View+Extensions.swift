@@ -185,4 +185,20 @@ public extension View {
     environment(\.blockAlignment, alignment)
   }
 
+  /// Sets a fixed xHeight value for LaTeX rendering, ensuring consistent sizing.
+  ///
+  /// - Parameter xHeight: The fixed xHeight value to use. Pass nil to use font-based calculation.
+  /// - Returns: A view that uses the fixed xHeight for rendering.
+  public func fixedXHeight(_ xHeight: CGFloat?) -> some View {
+    environment(\.fixedXHeight, xHeight)
+  }
+
+  /// Sets a fixed displayScale value for LaTeX rendering, ensuring consistent sizing on macOS.
+  ///
+  /// - Parameter scale: The fixed displayScale value to use. Pass nil to use environment-based calculation.
+  /// - Returns: A view that uses the fixed displayScale for rendering.
+  public func fixedDisplayScale(_ scale: CGFloat?) -> some View {
+    environment(\.fixedDisplayScale, scale)
+  }
+
 }
