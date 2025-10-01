@@ -71,6 +71,7 @@ internal class Cache {
     static let keyType: String = "image"
     let svg: SVG
     let xHeight: CGFloat
+    let displayScale: CGFloat
     internal var fallbackKey: String { String(data: svg.data, encoding: .utf8) ?? "" }
   }
   

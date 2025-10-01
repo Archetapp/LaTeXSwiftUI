@@ -319,10 +319,6 @@ extension LaTeX {
     let xHeight = fixedXHeight ?? (platformFont?.xHeight ?? font?.xHeight) ?? Font.body.xHeight
     let scale = fixedDisplayScale ?? displayScale
 
-    #if DEBUG && os(macOS)
-    NSLog("LaTeX.renderSync called with xHeight:\(xHeight) scale:\(scale) latex:'\(latex.prefix(50))'")
-    #endif
-
     return renderer.renderSync(
       latex: latex,
       unencodeHTML: unencodeHTML,

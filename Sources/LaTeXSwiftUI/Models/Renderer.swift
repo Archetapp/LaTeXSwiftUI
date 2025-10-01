@@ -376,10 +376,6 @@ extension Renderer {
         error: &conversionError)
     }
 
-    #if DEBUG && os(macOS)
-    NSLog("MathJax rendered '\(component.text)' (display:\(component.conversionOptions.display)) -> SVG length: \(svgString.count)")
-    #endif
-
     // Check for a conversion error
     let errorText = try getErrorText(from: conversionError)
 
@@ -409,17 +405,18 @@ extension Renderer {
     displayScale: CGFloat,
     renderingMode: SwiftUI.Image.TemplateRenderingMode
   ) -> SwiftUI.Image? {
-    // Create our cache key
-    let cacheKey = Cache.ImageCacheKey(svg: svg, xHeight: xHeight)
-    
+    // Create our cache key with displayScale included
+    let cacheKey = Cache.ImageCacheKey(svg: svg, xHeight: xHeight, displayScale: displayScale)
+
     // Check the cache for an image
     if let image = Cache.shared.imageCacheValue(for: cacheKey) {
-      return Image(image: image)
+      // Use the same scale when wrapping cached images
+      return Image(image: image, scale: displayScale)
         .renderingMode(renderingMode)
         .antialiased(true)
         .interpolation(.high)
     }
-    
+
     // Continue with getting the image
     let imageSize = svg.size(for: xHeight)
     #if os(iOS) || os(visionOS)
@@ -431,10 +428,10 @@ extension Renderer {
       return nil
     }
     #endif
-    
+
     // Set the image in the cache
     Cache.shared.setImageCacheValue(image, for: cacheKey)
-    
+
     // Finish up
     return Image(image: image, scale: displayScale)
       .renderingMode(renderingMode)
@@ -479,7 +476,7 @@ extension Renderer {
           return false
         }
         
-        let imageCacheKey = Cache.ImageCacheKey(svg: svg, xHeight: xHeight)
+        let imageCacheKey = Cache.ImageCacheKey(svg: svg, xHeight: xHeight, displayScale: displayScale)
         guard Cache.shared.imageCacheValue(for: imageCacheKey) != nil else {
           return false
         }

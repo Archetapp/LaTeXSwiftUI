@@ -118,16 +118,8 @@ internal struct SVGGeometry: Codable, Hashable {
       let height = height,
       let frame = frame
     else {
-      #if DEBUG && os(macOS)
-      NSLog("SVGGeometry parsing failed - verticalAlignment: \(String(describing: verticalAlignment)), width: \(String(describing: width)), height: \(String(describing: height)), frame: \(String(describing: frame))")
-      NSLog("SVG element: \(svgElement)")
-      #endif
       throw ParsingError.missingGeometry
     }
-
-    #if DEBUG && os(macOS)
-    NSLog("SVGGeometry parsed - width: \(width), height: \(height), verticalAlignment: \(verticalAlignment)")
-    #endif
 
     self.verticalAlignment = verticalAlignment
     self.width = width
