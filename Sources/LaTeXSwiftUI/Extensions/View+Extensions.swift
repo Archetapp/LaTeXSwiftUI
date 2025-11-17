@@ -201,4 +201,33 @@ public extension View {
     environment(\.fixedDisplayScale, scale)
   }
 
+  /// Enables automatic standard configuration for all LaTeX views in this view hierarchy.
+  ///
+  /// When enabled, all LaTeX views will automatically apply:
+  /// - Fixed x-height for consistent sizing
+  /// - Fixed display scale for consistent rendering
+  /// - Equation-only parsing mode
+  /// - Block views rendering mode
+  /// - Synchronous rendering (wait mode)
+  /// - Center block alignment
+  ///
+  /// - Parameters:
+  ///   - fixedXHeightValue: The fixed x-height value for consistent sizing
+  ///   - fixedDisplayScale: The fixed display scale (defaults to 2.0)
+  ///   - blockAlignment: The alignment for block equations (defaults to .center)
+  /// - Returns: A view that automatically configures all LaTeX views
+  public func latexStandardConfiguration(
+    fixedXHeightValue: CGFloat,
+    fixedDisplayScale: CGFloat = 2.0,
+    blockAlignment: LaTeX.BlockAlignment = .center
+  ) -> some View {
+    self
+      .fixedXHeight(fixedXHeightValue)
+      .fixedDisplayScale(fixedDisplayScale)
+      .parsingMode(.onlyEquations)
+      .blockMode(.blockViews)
+      .renderingStyle(.wait)
+      .blockAlignment(blockAlignment)
+  }
+
 }

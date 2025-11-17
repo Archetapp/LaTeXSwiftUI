@@ -274,6 +274,7 @@ extension Renderer {
         newBlocks.append(ComponentBlock(components: newComponents))
       }
       catch {
+        print("Error rendering block: \(error)")
         newBlocks.append(block)
         continue
       }

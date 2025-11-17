@@ -69,45 +69,52 @@ internal struct ComponentBlocksViews: View {
   // MARK: View body
 
   var body: some View {
-    VStack(alignment: .leading, spacing: lineSpacing + 4) {
-      ForEach(blocks, id: \.self) { block in
-        if block.isEquationBlock, let container = block.container, let svg = block.svg {
-          HStack(spacing: 0) {
-            EquationNumber(blockIndex: blocks.filter({ $0.isEquationBlock }).firstIndex(of: block) ?? 0, side: .left)
+    VStack(alignment: .leading, spacing: 0) {
+      ForEach(Array(blocks.enumerated()), id: \.element) { index, block in
+        let isLastBlock = index == blocks.count - 1
+        let nextBlock = index < blocks.count - 1 ? blocks[index + 1] : nil
+        let nextIsEquationBlock = nextBlock?.isEquationBlock ?? false
 
-            if let errorText = svg.errorText, errorMode != .rendered {
-              switch errorMode {
-              case .error:
-                Text(errorText)
-              case .original:
-                Text(block.components.first?.originalText ?? "")
-              default:
-                EmptyView()
+        Group {
+          if block.isEquationBlock, let container = block.container, let svg = block.svg {
+            HStack(spacing: 0) {
+              EquationNumber(blockIndex: blocks.filter({ $0.isEquationBlock }).firstIndex(of: block) ?? 0, side: .left)
+
+              if let errorText = svg.errorText, errorMode != .rendered {
+                switch errorMode {
+                case .error:
+                  Text(errorText)
+                case .original:
+                  Text(block.components.first?.originalText ?? "")
+                default:
+                  EmptyView()
+                }
               }
-            }
-            else {
-              HorizontalImageScroller(
-                image: container.image,
-                height: container.size.size.height)
-            }
+              else {
+                HorizontalImageScroller(
+                  image: container.image,
+                  height: container.size.size.height)
+              }
 
-            EquationNumber(blockIndex: blocks.filter({ $0.isEquationBlock }).firstIndex(of: block) ?? 0, side: .right)
+              EquationNumber(blockIndex: blocks.filter({ $0.isEquationBlock }).firstIndex(of: block) ?? 0, side: .right)
+            }
+            .frame(maxWidth: .infinity, alignment: frameAlignment)
           }
-          .frame(maxWidth: .infinity, alignment: frameAlignment)
-        }
-        else {
-          let xHeight = fixedXHeight
-            ?? (platformFont?.xHeight ?? font?.xHeight)
-            ?? Font.body.xHeight
-          let displayScale = fixedDisplayScale ?? envDisplayScale
+          else {
+            let xHeight = fixedXHeight
+              ?? (platformFont?.xHeight ?? font?.xHeight)
+              ?? Font.body.xHeight
+            let displayScale = fixedDisplayScale ?? envDisplayScale
 
-          block.toText(
-            xHeight: xHeight,
-            displayScale: displayScale,
-            renderingMode: imageRenderingMode,
-            errorMode: errorMode,
-            blockRenderingMode: blockMode,
-            ignoreStringFormatting: ignoreStringFormatting)
+            block.toText(
+              xHeight: xHeight,
+              displayScale: displayScale,
+              renderingMode: imageRenderingMode,
+              errorMode: errorMode,
+              blockRenderingMode: blockMode,
+              ignoreStringFormatting: ignoreStringFormatting)
+            .padding(.bottom, (!isLastBlock && !nextIsEquationBlock) ? 8 : 0)
+          }
         }
       }
     }

@@ -33,7 +33,7 @@ import SwiftUI
     LaTeX("""
     This is some text before the equation.
 
-    $$x = \\frac{-b \\pm \\sqrt{b^2 - 4ac}}{2a}$$
+    $\\cos \\frac{565\\pi}{6}$
 
     This is some text after the equation.
     """)

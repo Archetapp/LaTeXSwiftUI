@@ -270,7 +270,111 @@ extension LaTeX {
       .font(Font(font))
   }
 #endif
-  
+
+}
+
+// MARK: Standard Configuration
+
+extension LaTeX {
+
+  /// Applies the standard Brainblast LaTeX configuration with consistent rendering settings.
+  ///
+  /// This configuration includes:
+  /// - Fixed x-height for consistent sizing
+  /// - Fixed display scale for consistent rendering
+  /// - Equation-only parsing mode
+  /// - Block views rendering mode
+  /// - Synchronous rendering (wait mode)
+  /// - Custom block alignment
+  ///
+  /// - Parameters:
+  ///   - font: The font to use for rendering
+  ///   - fixedXHeightValue: The fixed x-height value for consistent sizing
+  ///   - fixedDisplayScale: The fixed display scale (defaults to 2.0)
+  ///   - latexBlockAlignment: The alignment for block equations (defaults to .center)
+  /// - Returns: A configured LaTeX view
+  public func standardConfiguration(
+    font: Font,
+    fixedXHeightValue: CGFloat,
+    fixedDisplayScale: CGFloat = 2.0,
+    latexBlockAlignment: BlockAlignment = .center
+  ) -> some View {
+    self
+      .font(font)
+      .fixedXHeight(fixedXHeightValue)
+      .fixedDisplayScale(fixedDisplayScale)
+      .parsingMode(.onlyEquations)
+      .blockMode(.blockViews)
+      .renderingStyle(.wait)
+      .blockAlignment(latexBlockAlignment)
+  }
+
+#if os(iOS) || os(visionOS)
+  /// Applies the standard Brainblast LaTeX configuration with consistent rendering settings.
+  ///
+  /// This configuration includes:
+  /// - Fixed x-height for consistent sizing
+  /// - Fixed display scale for consistent rendering
+  /// - Equation-only parsing mode
+  /// - Block views rendering mode
+  /// - Synchronous rendering (wait mode)
+  /// - Custom block alignment
+  ///
+  /// - Parameters:
+  ///   - font: The UIFont to use for rendering
+  ///   - fixedXHeightValue: The fixed x-height value for consistent sizing
+  ///   - fixedDisplayScale: The fixed display scale (defaults to 2.0)
+  ///   - latexBlockAlignment: The alignment for block equations (defaults to .center)
+  /// - Returns: A configured LaTeX view
+  public func standardConfiguration(
+    font: UIFont,
+    fixedXHeightValue: CGFloat,
+    fixedDisplayScale: CGFloat = 2.0,
+    latexBlockAlignment: BlockAlignment = .center
+  ) -> some View {
+    self
+      .font(font)
+      .fixedXHeight(fixedXHeightValue)
+      .fixedDisplayScale(fixedDisplayScale)
+      .parsingMode(.onlyEquations)
+      .blockMode(.blockViews)
+      .renderingStyle(.wait)
+      .blockAlignment(latexBlockAlignment)
+  }
+#else
+  /// Applies the standard Brainblast LaTeX configuration with consistent rendering settings.
+  ///
+  /// This configuration includes:
+  /// - Fixed x-height for consistent sizing
+  /// - Fixed display scale for consistent rendering
+  /// - Equation-only parsing mode
+  /// - Block views rendering mode
+  /// - Synchronous rendering (wait mode)
+  /// - Custom block alignment
+  ///
+  /// - Parameters:
+  ///   - font: The NSFont to use for rendering
+  ///   - fixedXHeightValue: The fixed x-height value for consistent sizing
+  ///   - fixedDisplayScale: The fixed display scale (defaults to 2.0)
+  ///   - latexBlockAlignment: The alignment for block equations (defaults to .center)
+  /// - Returns: A configured LaTeX view
+  public func standardConfiguration(
+    font: NSFont,
+    fixedXHeightValue: CGFloat,
+    fixedDisplayScale: CGFloat = 2.0,
+    latexBlockAlignment: BlockAlignment = .center
+  ) -> some View {
+    self
+      .font(font)
+      .fixedXHeight(fixedXHeightValue)
+      .fixedDisplayScale(fixedDisplayScale)
+      .parsingMode(.onlyEquations)
+      .blockMode(.blockViews)
+      .renderingStyle(.wait)
+      .blockAlignment(latexBlockAlignment)
+  }
+#endif
+
 }
 
 // MARK: Private methods
