@@ -545,7 +545,8 @@ extension Renderer {
     // No need to unwrap since NSImage is non-optional on macOS
     let finalImage = image
     #endif
-
+      
+    #if os(iOS) || os(visionOS)
     // Set the image in the cache
     Cache.shared.setImageCacheValue(image, for: cacheKey)
 
