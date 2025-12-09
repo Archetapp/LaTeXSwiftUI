@@ -38,22 +38,28 @@ internal struct ComponentBlocksText: View {
   
   /// The rendering mode to use with the rendered MathJax images.
   @Environment(\.imageRenderingMode) private var imageRenderingMode
-  
+
   /// What to do in the case of an error.
   @Environment(\.errorMode) private var errorMode
-  
+
   /// The view's font.
   @Environment(\.font) private var font
-  
+
   /// The view's UI/NSFont font.
   @Environment(\.platformFont) private var platformFont
-  
+
+  /// Fixed xHeight value for consistent rendering.
+  @Environment(\.fixedXHeight) private var fixedXHeight
+
   /// The view's current display scale.
-  @Environment(\.displayScale) private var displayScale
-  
+  @Environment(\.displayScale) private var envDisplayScale
+
+  /// Fixed displayScale value for consistent rendering.
+  @Environment(\.fixedDisplayScale) private var fixedDisplayScale
+
   /// The view's block rendering mode.
   @Environment(\.blockMode) private var blockMode
-  
+
   /// Whether string formatting such as markdown should be ignored or rendered.
   @Environment(\.ignoreStringFormatting) private var ignoreStringFormatting
   
@@ -78,8 +84,14 @@ extension ComponentBlocksText {
   /// - Parameter block: The component block.
   /// - Returns: A `Text` view.
   @MainActor private func text(for block: ComponentBlock) -> Text {
-    block.toText(
-      xHeight: (platformFont?.xHeight ?? font?.xHeight) ?? Font.body.xHeight,
+    let xHeight = fixedXHeight
+      ?? (platformFont?.xHeight ?? font?.xHeight)
+      ?? Font.body.xHeight
+
+    let displayScale = fixedDisplayScale ?? envDisplayScale
+
+    return block.toText(
+      xHeight: xHeight,
       displayScale: displayScale,
       renderingMode: imageRenderingMode,
       errorMode: errorMode,

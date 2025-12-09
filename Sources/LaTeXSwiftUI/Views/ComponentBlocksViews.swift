@@ -35,69 +35,113 @@ internal struct ComponentBlocksViews: View {
   
   /// The rendering mode to use with the rendered MathJax images.
   @Environment(\.imageRenderingMode) private var imageRenderingMode
-  
+
   /// What to do in the case of an error.
   @Environment(\.errorMode) private var errorMode
-  
+
   /// The view's font.
   @Environment(\.font) private var font
-  
+
   /// The view's UI/NSFont font.
   @Environment(\.platformFont) private var platformFont
-  
+
+  /// Fixed xHeight value for consistent rendering.
+  @Environment(\.fixedXHeight) private var fixedXHeight
+
   /// The view's current display scale.
-  @Environment(\.displayScale) private var displayScale
-  
+  @Environment(\.displayScale) private var envDisplayScale
+
+  /// Fixed displayScale value for consistent rendering.
+  @Environment(\.fixedDisplayScale) private var fixedDisplayScale
+
   /// The view's block rendering mode.
   @Environment(\.blockMode) private var blockMode
-  
+
   /// The text's line spacing.
   @Environment(\.lineSpacing) private var lineSpacing
-  
+
   /// Whether string formatting such as markdown should be ignored or rendered.
   @Environment(\.ignoreStringFormatting) private var ignoreStringFormatting
-  
+
+  /// The block alignment to use.
+  @Environment(\.blockAlignment) private var blockAlignment
+
   // MARK: View body
-  
+
   var body: some View {
-    VStack(alignment: .leading, spacing: lineSpacing + 4) {
-      ForEach(blocks, id: \.self) { block in
-        if block.isEquationBlock, let container = block.container, let svg = block.svg {
-          HStack(spacing: 0) {
-            EquationNumber(blockIndex: blocks.filter({ $0.isEquationBlock }).firstIndex(of: block) ?? 0, side: .left)
-            
-            if let errorText = svg.errorText, errorMode != .rendered {
-              switch errorMode {
-              case .error:
-                Text(errorText)
-              case .original:
-                Text(block.components.first?.originalText ?? "")
-              default:
-                EmptyView()
+    VStack(alignment: .leading, spacing: 0) {
+      ForEach(Array(blocks.enumerated()), id: \.element) { index, block in
+        let isLastBlock = index == blocks.count - 1
+        let nextBlock = index < blocks.count - 1 ? blocks[index + 1] : nil
+        let nextIsEquationBlock = nextBlock?.isEquationBlock ?? false
+
+        Group {
+          if block.isEquationBlock, let container = block.container, let svg = block.svg {
+            HStack(spacing: 0) {
+              EquationNumber(blockIndex: blocks.filter({ $0.isEquationBlock }).firstIndex(of: block) ?? 0, side: .left)
+
+              if let errorText = svg.errorText, errorMode != .rendered {
+                switch errorMode {
+                case .error:
+                  Text(errorText)
+                case .original:
+                  Text(block.components.first?.originalText ?? "")
+                default:
+                  EmptyView()
+                }
               }
+              else {
+                HorizontalImageScroller(
+                  image: container.image,
+                  height: container.size.size.height)
+              }
+
+              EquationNumber(blockIndex: blocks.filter({ $0.isEquationBlock }).firstIndex(of: block) ?? 0, side: .right)
             }
-            else {
-              HorizontalImageScroller(
-                image: container.image,
-                height: container.size.size.height)
-            }
-            
-            EquationNumber(blockIndex: blocks.filter({ $0.isEquationBlock }).firstIndex(of: block) ?? 0, side: .right)
+            .frame(maxWidth: .infinity, alignment: frameAlignment)
           }
-        }
-        else {
-          block.toText(
-            xHeight: (platformFont?.xHeight ?? font?.xHeight) ?? Font.body.xHeight,
-            displayScale: displayScale,
-            renderingMode: imageRenderingMode,
-            errorMode: errorMode,
-            blockRenderingMode: blockMode,
-            ignoreStringFormatting: ignoreStringFormatting)
+          else {
+            let xHeight = fixedXHeight
+              ?? (platformFont?.xHeight ?? font?.xHeight)
+              ?? Font.body.xHeight
+            let displayScale = fixedDisplayScale ?? envDisplayScale
+
+            block.toText(
+              xHeight: xHeight,
+              displayScale: displayScale,
+              renderingMode: imageRenderingMode,
+              errorMode: errorMode,
+              blockRenderingMode: blockMode,
+              ignoreStringFormatting: ignoreStringFormatting)
+            .padding(.bottom, (!isLastBlock && !nextIsEquationBlock) ? 8 : 0)
+          }
         }
       }
     }
   }
-  
+
+  private var swiftUIAlignment: HorizontalAlignment {
+    switch blockAlignment {
+    case .leading:
+      return .leading
+    case .center:
+      return .center
+    case .trailing:
+      return .trailing
+    }
+  }
+
+  private var frameAlignment: Alignment {
+    switch blockAlignment {
+    case .leading:
+      return .leading
+    case .center:
+      return .center
+    case .trailing:
+      return .trailing
+    }
+  }
+
 }
 
 struct ComponentBlocksViewsPreviews: PreviewProvider {

@@ -40,14 +40,6 @@ internal class Renderer: ObservableObject {
   
   // MARK: Types
   
-  /// Rendering errors that can occur during the rendering process.
-  enum RenderingError: Error {
-    case svgGenerationFailed
-    case imageGenerationFailed
-    case mathJaxUnavailable
-    case cacheCorrupted
-  }
-  
   /// A set of values used to create an array of parsed component blocks.
   struct ParsingSource: Equatable {
     
@@ -269,29 +261,7 @@ extension Renderer {
     renderingMode: SwiftUI.Image.TemplateRenderingMode,
     texOptions: TeXInputProcessorOptions
   ) -> [ComponentBlock] {
-    return renderWithRetry(
-      blocks: blocks,
-      xHeight: xHeight,
-      displayScale: displayScale,
-      renderingMode: renderingMode,
-      texOptions: texOptions,
-      retryCount: 0
-    )
-  }
-  
-  /// Internal render method with retry logic.
-  private func renderWithRetry(
-    blocks: [ComponentBlock],
-    xHeight: CGFloat,
-    displayScale: CGFloat,
-    renderingMode: SwiftUI.Image.TemplateRenderingMode,
-    texOptions: TeXInputProcessorOptions,
-    retryCount: Int
-  ) -> [ComponentBlock] {
     var newBlocks = [ComponentBlock]()
-    var hasRenderingFailures = false
-    let maxRetries = 1 // Only retry once after cache clear
-    
     for block in blocks {
       do {
         let newComponents = try render(
@@ -304,29 +274,10 @@ extension Renderer {
         newBlocks.append(ComponentBlock(components: newComponents))
       }
       catch {
+        print("Error rendering block: \(error)")
         newBlocks.append(block)
         continue
       }
-    }
-    
-    // Record rendering result and handle retries
-    if hasRenderingFailures {
-      let cachesCleared = Cache.shared.recordRenderingFailure()
-      if cachesCleared && retryCount < maxRetries {
-        NSLog("LaTeXSwiftUI: Retrying render after cache clear (attempt \(retryCount + 1))")
-        // Wait a brief moment for cache clearing to complete
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-          // Note: This is a simplified retry - in a real implementation you might want 
-          // to handle this more carefully to avoid recursive calls on the main thread
-        }
-        // For now, just return the failed blocks to avoid infinite recursion
-        // A more sophisticated implementation might use a completion handler pattern
-        return newBlocks
-      } else if cachesCleared {
-        NSLog("LaTeXSwiftUI: Maximum retries reached after cache clear")
-      }
-    } else {
-      Cache.shared.recordRenderingSuccess()
     }
     
     return newBlocks
@@ -351,7 +302,6 @@ extension Renderer {
   ) throws -> [Component] {
     // Iterate through the input components and render
     var renderedComponents = [Component]()
-    
     for component in components {
       // Only render equation components
       guard component.type.isEquation else {
@@ -359,36 +309,28 @@ extension Renderer {
         continue
       }
       
-      do {
-        // Get the svg
-        guard let svg = try getSVG(for: component, texOptions: texOptions) else {
-          NSLog("LaTeXSwiftUI: Failed to generate SVG for component: \(component.text)")
-          throw RenderingError.svgGenerationFailed
-        }
-        
-        // Get the image
-        guard let image = getImage(for: svg, xHeight: xHeight, displayScale: displayScale, renderingMode: renderingMode) else {
-          NSLog("LaTeXSwiftUI: Failed to generate image for component: \(component.text)")
-          throw RenderingError.imageGenerationFailed
-        }
-        
-        // Save the rendered component
-        renderedComponents.append(Component(
-          text: component.text,
-          type: component.type,
-          svg: svg,
-          imageContainer: ImageContainer(
-            image: image,
-            size: HashableCGSize(svg.size(for: xHeight))
-          )
-        ))
-        
-      } catch {
-        NSLog("LaTeXSwiftUI: Rendering failed for component '\(component.text)': \(error)")
-        // Append the original component without rendered content
-        renderedComponents.append(Component(text: component.text, type: component.type))
-        throw error
+      // Get the svg
+      guard let svg = try getSVG(for: component, texOptions: texOptions) else {
+        renderedComponents.append(component)
+        continue
       }
+      
+      // Get the image
+      guard let image = getImage(for: svg, xHeight: xHeight, displayScale: displayScale, renderingMode: renderingMode) else {
+        renderedComponents.append(Component(text: component.text, type: component.type, svg: svg))
+        continue
+      }
+      
+      // Save the rendered component
+      renderedComponents.append(Component(
+        text: component.text,
+        type: component.type,
+        svg: svg,
+        imageContainer: ImageContainer(
+          image: image,
+          size: HashableCGSize(svg.size(for: xHeight))
+        )
+      ))
     }
     
     // All done
@@ -415,20 +357,12 @@ extension Renderer {
     
     // Do we have the SVG in the cache?
     if let svgData = Cache.shared.dataCacheValue(for: svgCacheKey) {
-      do {
-        return try SVG(data: svgData)
-      } catch {
-        NSLog("LaTeXSwiftUI: Corrupted SVG data in cache for component: \(component.text)")
-        // Remove the corrupted cache entry
-        Cache.shared.dataCache.removeObject(forKey: svgCacheKey.key() as NSString)
-        // Continue to regenerate
-      }
+      return try SVG(data: svgData)
     }
     
     // Make sure we have a MathJax instance!
     guard let mathjax = MathJax.svgRenderer else {
-      NSLog("LaTeXSwiftUI: MathJax renderer is unavailable")
-      throw RenderingError.mathJaxUnavailable
+      return nil
     }
 
     // Perform the TeX -> SVG conversion with synchronization
@@ -449,12 +383,7 @@ extension Renderer {
     let svg = try SVG(svgString: svgString, errorText: errorText)
     
     // Set the SVG in the cache
-    do {
-      Cache.shared.setDataCacheValue(try svg.encoded(), for: svgCacheKey)
-    } catch {
-      NSLog("LaTeXSwiftUI: Failed to cache SVG data: \(error)")
-      // Don't throw here, we still have the SVG
-    }
+    Cache.shared.setDataCacheValue(try svg.encoded(), for: svgCacheKey)
     
     // Finish up
     return svg
@@ -490,60 +419,14 @@ extension Renderer {
 
     // Continue with getting the image
     let imageSize = svg.size(for: xHeight)
-    
-    // Validate image size before proceeding
-    guard imageSize.width > 0 && imageSize.height > 0 else {
-      NSLog("LaTeXSwiftUI: Invalid image size calculated: \(imageSize)")
-      return nil
-    }
-    
     #if os(iOS) || os(visionOS)
-    guard let svgInstance = SwiftDraw.SVG(data: svg.data) else {
-      NSLog("LaTeXSwiftUI: Failed to create SwiftDraw SVG instance")
-      return nil
-    }
-    
-    let image = svgInstance.rasterize(size: imageSize, scale: displayScale)
-    
-    // Validate the generated image
-    guard image.size.width > 0 && image.size.height > 0 else {
-      NSLog("LaTeXSwiftUI: Generated image has invalid size: \(image.size)")
+    guard let image = SwiftDraw.SVG(data: svg.data)?.rasterize(size: imageSize, scale: displayScale) else {
       return nil
     }
     #else
-    // On macOS, we need to ensure the image is created with consistent dimensions
-    guard let svgInstance = SwiftDraw.SVG(data: svg.data) else {
-      NSLog("LaTeXSwiftUI: Failed to create SwiftDraw SVG instance")
+    guard let image = SwiftDraw.SVG(data: svg.data)?.rasterize(with: imageSize, scale: displayScale) else {
       return nil
     }
-    
-    let scale = max(1.0, displayScale)
-    // Use explicit size and ensure consistent scaling
-    let image = svgInstance.rasterize(with: imageSize, scale: scale)
-    
-    // Validate the generated image
-    guard image.size.width > 0 && image.size.height > 0 else {
-      NSLog("LaTeXSwiftUI: Generated image has invalid size: \(image.size)")
-      // Try fallback with minimum size
-      let fallbackSize = CGSize(width: max(1, imageSize.width), height: max(1, imageSize.height))
-      let fallbackImage = svgInstance.rasterize(with: fallbackSize, scale: scale)
-      
-      guard fallbackImage.size.width > 0 && fallbackImage.size.height > 0 else {
-        NSLog("LaTeXSwiftUI: Fallback image generation also failed")
-        return nil
-      }
-      
-      // Set the fallback image in the cache
-      Cache.shared.setImageCacheValue(fallbackImage, for: cacheKey)
-      
-      return Image(image: fallbackImage, scale: scale)
-        .renderingMode(renderingMode)
-        .antialiased(true)
-        .interpolation(.high)
-    }
-    
-    // No need to unwrap since NSImage is non-optional on macOS
-    let finalImage = image
     #endif
 
     // Set the image in the cache
@@ -554,14 +437,6 @@ extension Renderer {
       .renderingMode(renderingMode)
       .antialiased(true)
       .interpolation(.high)
-    #else
-    Cache.shared.setImageCacheValue(finalImage, for: cacheKey)
-    
-    return Image(image: finalImage, scale: scale)
-      .renderingMode(renderingMode)
-      .antialiased(true)
-      .interpolation(.high)
-    #endif
   }
   
   /// Gets the error text from a possibly non-nil error.

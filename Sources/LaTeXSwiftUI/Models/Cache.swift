@@ -71,6 +71,7 @@ internal class Cache {
     static let keyType: String = "image"
     let svg: SVG
     let xHeight: CGFloat
+    let displayScale: CGFloat
     internal var fallbackKey: String { String(data: svg.data, encoding: .utf8) ?? "" }
   }
   
@@ -113,21 +114,23 @@ extension Cache {
   /// - Parameter key: The key of the value to get.
   /// - Returns: A value.
   func dataCacheValue(for key: SVGCacheKey) -> Data? {
+    let cacheKey = key.key()
     return dataCacheQueue.sync { [weak self] in
       guard let self = self else { return nil }
-      return self.dataCache.object(forKey: key.key() as NSString) as Data?
+      return self.dataCache.object(forKey: cacheKey as NSString) as Data?
     }
   }
-  
+
   /// Safely sets the cache value.
   ///
   /// - Parameters:
   ///   - value: The value to set.
   ///   - key: The value's key.
   func setDataCacheValue(_ value: Data, for key: SVGCacheKey) {
+    let cacheKey = key.key()
     dataCacheQueue.async(flags: .barrier) { [weak self] in
       guard let self = self else { return }
-      self.dataCache.setObject(value as NSData, forKey: key.key() as NSString)
+      self.dataCache.setObject(value as NSData, forKey: cacheKey as NSString)
     }
   }
   
@@ -136,21 +139,23 @@ extension Cache {
   /// - Parameter key: The key of the value to get.
   /// - Returns: A value.
   func imageCacheValue(for key: ImageCacheKey) -> _Image? {
+    let cacheKey = key.key()
     return imageCacheQueue.sync { [weak self] in
       guard let self = self else { return nil }
-      return self.imageCache.object(forKey: key.key() as NSString)
+      return self.imageCache.object(forKey: cacheKey as NSString)
     }
   }
-  
+
   /// Safely sets the cache value.
   ///
   /// - Parameters:
   ///   - value: The value to set.
   ///   - key: The value's key.
   func setImageCacheValue(_ value: _Image, for key: ImageCacheKey) {
+    let cacheKey = key.key()
     imageCacheQueue.async(flags: .barrier) { [weak self] in
       guard let self = self else { return }
-      self.imageCache.setObject(value, forKey: key.key() as NSString)
+      self.imageCache.setObject(value, forKey: cacheKey as NSString)
     }
   }
   

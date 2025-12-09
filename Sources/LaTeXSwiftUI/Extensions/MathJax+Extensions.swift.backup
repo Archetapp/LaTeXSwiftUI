@@ -33,6 +33,7 @@ internal extension MathJax {
       return try MathJax(preferredOutputFormat: .svg)
     }
     catch {
+      print("Error creating MathJax instance: \(error)")
       return nil
     }
   }()

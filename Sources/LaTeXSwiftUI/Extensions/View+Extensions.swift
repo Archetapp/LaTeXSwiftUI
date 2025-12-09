@@ -176,18 +176,57 @@ public extension View {
   internal func platformFont(_ font: _Font? = nil) -> some View {
     environment(\.platformFont, font)
   }
-  
-  /// Clears all LaTeX rendering caches.
+
+  /// Sets the alignment for block equations.
   ///
-  /// This method completely clears both the SVG data cache and the rendered
-  /// image cache. Use this if you're experiencing rendering issues or want
-  /// to free up memory. This is a convenience method that calls
-  /// `LaTeX.clearAllCaches()`.
-  ///
-  /// - Returns: The view unchanged.
-  func clearLaTeXCaches() -> some View {
-    LaTeX.clearAllCaches()
-    return self
+  /// - Parameter alignment: The block alignment to use.
+  /// - Returns: A view that applies the alignment to block equations.
+  func blockAlignment(_ alignment: LaTeX.BlockAlignment) -> some View {
+    environment(\.blockAlignment, alignment)
   }
-  
+
+  /// Sets a fixed xHeight value for LaTeX rendering, ensuring consistent sizing.
+  ///
+  /// - Parameter xHeight: The fixed xHeight value to use. Pass nil to use font-based calculation.
+  /// - Returns: A view that uses the fixed xHeight for rendering.
+  public func fixedXHeight(_ xHeight: CGFloat?) -> some View {
+    environment(\.fixedXHeight, xHeight)
+  }
+
+  /// Sets a fixed displayScale value for LaTeX rendering, ensuring consistent sizing on macOS.
+  ///
+  /// - Parameter scale: The fixed displayScale value to use. Pass nil to use environment-based calculation.
+  /// - Returns: A view that uses the fixed displayScale for rendering.
+  public func fixedDisplayScale(_ scale: CGFloat?) -> some View {
+    environment(\.fixedDisplayScale, scale)
+  }
+
+  /// Enables automatic standard configuration for all LaTeX views in this view hierarchy.
+  ///
+  /// When enabled, all LaTeX views will automatically apply:
+  /// - Fixed x-height for consistent sizing
+  /// - Fixed display scale for consistent rendering
+  /// - Equation-only parsing mode
+  /// - Block views rendering mode
+  /// - Synchronous rendering (wait mode)
+  /// - Center block alignment
+  ///
+  /// - Parameters:
+  ///   - fixedXHeightValue: The fixed x-height value for consistent sizing
+  ///   - fixedDisplayScale: The fixed display scale (defaults to 2.0)
+  ///   - blockAlignment: The alignment for block equations (defaults to .center)
+  /// - Returns: A view that automatically configures all LaTeX views
+  public func latexStandardConfiguration(
+    fixedXHeightValue: CGFloat,
+    fixedDisplayScale: CGFloat = 2.0,
+    blockAlignment: LaTeX.BlockAlignment = .center
+  ) -> some View {
+    self
+      .fixedXHeight(fixedXHeightValue)
+      .fixedDisplayScale(fixedDisplayScale)
+      .parsingMode(.onlyEquations)
+      .blockMode(.blockViews)
+      .renderingStyle(.wait)
+      .blockAlignment(blockAlignment)
+  }
 }

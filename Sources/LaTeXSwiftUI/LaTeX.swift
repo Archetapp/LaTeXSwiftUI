@@ -88,10 +88,10 @@ public struct LaTeX: View {
   
   /// The view's rendering style.
   public enum RenderingStyle {
-    
+
     /// The view remains empty until its finished rendering.
     case empty
-    
+
     /// The view displays the input text until it's finished rendering.
     case original
 
@@ -101,9 +101,22 @@ public struct LaTeX: View {
 
     /// The view displays a progress view until it's finished rendering.
     case progress
-    
+
     /// The view blocks on the main thread until it's finished rendering.
     case wait
+  }
+
+  /// The view's block alignment.
+  public enum BlockAlignment {
+
+    /// Block equations are aligned to the leading edge.
+    case leading
+
+    /// Block equations are centered.
+    case center
+
+    /// Block equations are aligned to the trailing edge.
+    case trailing
   }
   
   // MARK: Static properties
@@ -168,7 +181,13 @@ public struct LaTeX: View {
   
   /// The view's UI/NSFont font.
   @Environment(\.platformFont) private var platformFont
-  
+
+  /// Fixed xHeight value for consistent rendering.
+  @Environment(\.fixedXHeight) private var fixedXHeight
+
+  /// Fixed displayScale value for consistent rendering.
+  @Environment(\.fixedDisplayScale) private var fixedDisplayScale
+
   // MARK: Private properties
   
   /// The view's renderer.
@@ -256,24 +275,109 @@ extension LaTeX {
       .font(Font(font))
   }
 #endif
-  
-  /// Clears all LaTeX rendering caches.
+}
+
+// MARK: Standard Configuration
+
+extension LaTeX {
+
+  /// Applies the standard Brainblast LaTeX configuration with consistent rendering settings.
   ///
-  /// This method completely clears both the SVG data cache and the rendered
-  /// image cache. Use this if you're experiencing rendering issues or want
-  /// to free up memory.
-  public static func clearAllCaches() {
-    Cache.shared.clearAllCaches()
-  }
-  
-  /// Returns the current number of consecutive rendering failures.
+  /// This configuration includes:
+  /// - Fixed x-height for consistent sizing
+  /// - Fixed display scale for consistent rendering
+  /// - Equation-only parsing mode
+  /// - Block views rendering mode
+  /// - Synchronous rendering (wait mode)
+  /// - Custom block alignment
   ///
-  /// This can be useful for debugging rendering issues. The caches will
-  /// automatically clear when this reaches the threshold (currently 3).
-  public static var consecutiveRenderingFailures: Int {
-    Cache.shared.consecutiveFailures
+  /// - Parameters:
+  ///   - font: The font to use for rendering
+  ///   - fixedXHeightValue: The fixed x-height value for consistent sizing
+  ///   - fixedDisplayScale: The fixed display scale (defaults to 2.0)
+  ///   - latexBlockAlignment: The alignment for block equations (defaults to .center)
+  /// - Returns: A configured LaTeX view
+  public func standardConfiguration(
+    font: Font,
+    fixedXHeightValue: CGFloat,
+    fixedDisplayScale: CGFloat = 2.0,
+    latexBlockAlignment: BlockAlignment = .center
+  ) -> some View {
+    self
+      .font(font)
+      .fixedXHeight(fixedXHeightValue)
+      .fixedDisplayScale(fixedDisplayScale)
+      .parsingMode(.onlyEquations)
+      .blockMode(.blockViews)
+      .renderingStyle(.wait)
+      .blockAlignment(latexBlockAlignment)
   }
-  
+
+#if os(iOS) || os(visionOS)
+  /// Applies the standard Brainblast LaTeX configuration with consistent rendering settings.
+  ///
+  /// This configuration includes:
+  /// - Fixed x-height for consistent sizing
+  /// - Fixed display scale for consistent rendering
+  /// - Equation-only parsing mode
+  /// - Block views rendering mode
+  /// - Synchronous rendering (wait mode)
+  /// - Custom block alignment
+  ///
+  /// - Parameters:
+  ///   - font: The UIFont to use for rendering
+  ///   - fixedXHeightValue: The fixed x-height value for consistent sizing
+  ///   - fixedDisplayScale: The fixed display scale (defaults to 2.0)
+  ///   - latexBlockAlignment: The alignment for block equations (defaults to .center)
+  /// - Returns: A configured LaTeX view
+  public func standardConfiguration(
+    font: UIFont,
+    fixedXHeightValue: CGFloat,
+    fixedDisplayScale: CGFloat = 2.0,
+    latexBlockAlignment: BlockAlignment = .center
+  ) -> some View {
+    self
+      .font(font)
+      .fixedXHeight(fixedXHeightValue)
+      .fixedDisplayScale(fixedDisplayScale)
+      .parsingMode(.onlyEquations)
+      .blockMode(.blockViews)
+      .renderingStyle(.wait)
+      .blockAlignment(latexBlockAlignment)
+  }
+#else
+  /// Applies the standard Brainblast LaTeX configuration with consistent rendering settings.
+  ///
+  /// This configuration includes:
+  /// - Fixed x-height for consistent sizing
+  /// - Fixed display scale for consistent rendering
+  /// - Equation-only parsing mode
+  /// - Block views rendering mode
+  /// - Synchronous rendering (wait mode)
+  /// - Custom block alignment
+  ///
+  /// - Parameters:
+  ///   - font: The NSFont to use for rendering
+  ///   - fixedXHeightValue: The fixed x-height value for consistent sizing
+  ///   - fixedDisplayScale: The fixed display scale (defaults to 2.0)
+  ///   - latexBlockAlignment: The alignment for block equations (defaults to .center)
+  /// - Returns: A configured LaTeX view
+  public func standardConfiguration(
+    font: NSFont,
+    fixedXHeightValue: CGFloat,
+    fixedDisplayScale: CGFloat = 2.0,
+    latexBlockAlignment: BlockAlignment = .center
+  ) -> some View {
+    self
+      .font(font)
+      .fixedXHeight(fixedXHeightValue)
+      .fixedDisplayScale(fixedDisplayScale)
+      .parsingMode(.onlyEquations)
+      .blockMode(.blockViews)
+      .renderingStyle(.wait)
+      .blockAlignment(latexBlockAlignment)
+  }
+#endif
 }
 
 // MARK: Private methods
@@ -288,26 +392,30 @@ extension LaTeX {
   /// - Returns: A boolean indicating whether the components to the view are
   ///   cached.
   private func isCached() -> Bool {
-    renderer.isCached(
+    let xHeight = fixedXHeight ?? (platformFont?.xHeight ?? font?.xHeight) ?? Font.body.xHeight
+    let scale = fixedDisplayScale ?? displayScale
+    return renderer.isCached(
       latex: latex,
       unencodeHTML: unencodeHTML,
       parsingMode: parsingMode,
       processEscapes: processEscapes,
       errorMode: errorMode,
-      xHeight: (platformFont?.xHeight ?? font?.xHeight) ?? Font.body.xHeight,
-      displayScale: displayScale)
+      xHeight: xHeight,
+      displayScale: scale)
   }
   
   /// Renders the view's components.
   private func renderAsync() async {
+    let xHeight = fixedXHeight ?? (platformFont?.xHeight ?? font?.xHeight) ?? Font.body.xHeight
+    let scale = fixedDisplayScale ?? displayScale
     await renderer.render(
       latex: latex,
       unencodeHTML: unencodeHTML,
       parsingMode: parsingMode,
       processEscapes: processEscapes,
       errorMode: errorMode,
-      xHeight: (platformFont?.xHeight ?? font?.xHeight) ?? Font.body.xHeight,
-      displayScale: displayScale,
+      xHeight: xHeight,
+      displayScale: scale,
       renderingMode: imageRenderingMode)
   }
   
@@ -315,14 +423,17 @@ extension LaTeX {
   ///
   /// - Returns: The rendered components.
   private func renderSync() -> [ComponentBlock] {
-    renderer.renderSync(
+    let xHeight = fixedXHeight ?? (platformFont?.xHeight ?? font?.xHeight) ?? Font.body.xHeight
+    let scale = fixedDisplayScale ?? displayScale
+
+    return renderer.renderSync(
       latex: latex,
       unencodeHTML: unencodeHTML,
       parsingMode: parsingMode,
       processEscapes: processEscapes,
       errorMode: errorMode,
-      xHeight: (platformFont?.xHeight ?? font?.xHeight) ?? Font.body.xHeight,
-      displayScale: displayScale,
+      xHeight: xHeight,
+      displayScale: scale,
       renderingMode: imageRenderingMode)
   }
   
