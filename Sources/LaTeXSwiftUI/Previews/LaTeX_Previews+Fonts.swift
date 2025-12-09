@@ -34,25 +34,39 @@ typealias PlatformFont = NSFont
 #endif
 
 struct LaTeX_Previews_Fonts: PreviewProvider {
-  
-  static var previews: some View {
-    VStack {
-      LaTeX("Hello, $\\LaTeX$!")
-        .font(.system(size: 25))
-      
-      LaTeX("Hello, $\\LaTeX$!")
-        .font(PlatformFont.preferredFont(forTextStyle: .title1))
-      
-      LaTeX("Hello, $\\LaTeX$!")
-        .font(PlatformFont.systemFont(ofSize: 36))
-      
-      LaTeX("Hello, $\\LaTeX$!")
-        .font(PlatformFont.boldSystemFont(ofSize: 25))
-      
-      LaTeX("Hello, $\\LaTeX$!")
-        .font(PlatformFont(name: "Avenir", size: 25)!)
+    
+    static var previews: some View {
+        NavigationView {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    // Question header with improved layout
+                    VStack(alignment: .leading, spacing: 12) {
+                        HStack {
+                            Text("Question")
+                                .font(.headline)
+                                .foregroundColor(.secondary)
+                            
+                            Spacer()
+                        }
+                        
+                        LaTeX("Choice A is correct. Adding $25$ to both sides of the given equation yields $5x=55$. Dividing both sides of this equation by $5$ yields $x=11$. Therefore, the value of $x-6$ is $11-6=5$.")
+                    }
+                }
+                
+                //      LaTeX("Hello, $\\LaTeX$!")
+                //        .font(PlatformFont.preferredFont(forTextStyle: .title1))
+                //
+                //      LaTeX("Hello, $\\LaTeX$!")
+                //        .font(PlatformFont.systemFont(ofSize: 36))
+                //
+                //      LaTeX("Hello, $\\LaTeX$!")
+                //        .font(PlatformFont.boldSystemFont(ofSize: 25))
+                //
+                //      LaTeX("Hello, $\\LaTeX$!")
+                //        .font(PlatformFont(name: "Avenir", size: 25)!)
+            }
+            .previewDisplayName("Fonts")
+        }
     }
-    .previewDisplayName("Fonts")
-  }
-  
+    
 }

@@ -229,5 +229,4 @@ public extension View {
       .renderingStyle(.wait)
       .blockAlignment(blockAlignment)
   }
-
 }

@@ -227,8 +227,21 @@ extension Component {
         }
       }
       else if let imageContainer {
+        #if os(iOS) || os(visionOS)
+        // Standard iOS behavior
         let offset = svg.geometry.verticalAlignment.toPoints(xHeight)
         text = Text(imageContainer.image).baselineOffset(blockRenderingMode == .alwaysInline || !isInEquationBlock ? offset : 0)
+        #else
+        // Modified macOS behavior
+        let offset = svg.geometry.verticalAlignment.toPoints(xHeight)
+        
+        // Create a more stable text view with the image
+        let baseText = Text(imageContainer.image)
+          .baselineOffset(blockRenderingMode == .alwaysInline || !isInEquationBlock ? offset : 0)
+        
+        // On macOS, we add empty text elements to help stabilize the layout
+        text = Text("").font(.system(size: 0.1)) + baseText + Text("").font(.system(size: 0.1))
+        #endif
       }
       else {
         text = Text("")
