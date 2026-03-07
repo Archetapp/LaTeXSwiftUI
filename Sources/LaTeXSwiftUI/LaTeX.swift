@@ -30,102 +30,14 @@ import SwiftUI
 /// A view that can parse and render TeX and LaTeX equations that contain
 /// math-mode marcos.
 public struct LaTeX: View {
-  
-  // MARK: Types
-  
-  /// A closure that takes an equation number and returns a string to display in
-  /// the view.
-  public typealias FormatEquationNumber = (_ n: Int) -> String
-  
-  /// The view's block rendering mode.
-  public enum BlockMode {
-    
-    /// Block equations are ignored and always rendered inline.
-    case alwaysInline
-    
-    /// Blocks are rendered as text with newlines.
-    case blockText
-    
-    /// Blocks are rendered as views.
-    case blockViews
-  }
-  
-  /// The view's equation number mode.
-  public enum EquationNumberMode {
-    
-    /// The view should not number named block equations.
-    case none
-    
-    /// The view should number named block equations on the left side.
-    case left
-    
-    /// The view should number named block equations on the right side.
-    case right
-  }
-  
-  /// The view's error mode.
-  public enum ErrorMode {
-    
-    /// The rendered image should be displayed (if available).
-    case rendered
-    
-    /// The original LaTeX input should be displayed.
-    case original
-    
-    /// The error text should be displayed.
-    case error
-  }
-  
-  /// The view's rendering mode.
-  public enum ParsingMode {
-    
-    /// Render the entire text as the equation.
-    case all
-    
-    /// Find equations in the text and only render the equations.
-    case onlyEquations
-  }
-  
-  /// The view's rendering style.
-  public enum RenderingStyle {
 
-    /// The view remains empty until its finished rendering.
-    case empty
-
-    /// The view displays the input text until it's finished rendering.
-    case original
-
-    /// The view displays a redacted version of the view until it's finished
-    /// rendering.
-    case redactedOriginal
-
-    /// The view displays a progress view until it's finished rendering.
-    case progress
-
-    /// The view blocks on the main thread until it's finished rendering.
-    case wait
-  }
-
-  /// The view's block alignment.
-  public enum BlockAlignment {
-
-    /// Block equations are aligned to the leading edge.
-    case leading
-
-    /// Block equations are centered.
-    case center
-
-    /// Block equations are aligned to the trailing edge.
-    case trailing
-  }
-  
   // MARK: Static properties
-  
+
   /// The package's shared data cache.
   public static var dataCache: NSCache<NSString, NSData> {
     Cache.shared.dataCache
   }
-  
+
 #if os(macOS)
   /// The package's shared image cache.
   public static var imageCache: NSCache<NSString, NSImage> {
@@ -137,122 +49,105 @@ public struct LaTeX: View {
     Cache.shared.imageCache
   }
 #endif
-  
-  
+
+  /// Releases the MathJax renderer instance to free memory (~512MB).
+  ///
+  /// Call this method when LaTeX rendering is no longer needed (e.g., when exiting a game)
+  /// to reclaim the memory used by the JavaScriptCore context.
+  /// The renderer will be lazily re-initialized on the next LaTeX render.
+  ///
+  /// - Note: This also clears the data and image caches.
+  public static func releaseRenderer() {
+    MathJax.releaseRenderer()
+    dataCache.removeAllObjects()
+    imageCache.removeAllObjects()
+  }
+
   // MARK: Public properties
-  
+
   /// The view's LaTeX input string.
   public let latex: String
-  
+
   // MARK: Environment variables
-  
-  /// What to do in the case of an error.
+
   @Environment(\.errorMode) private var errorMode
-  
-  /// Whether or not we should unencode the input.
   @Environment(\.unencodeHTML) private var unencodeHTML
-  
-  /// Should the view parse the entire input string or only equations?
   @Environment(\.parsingMode) private var parsingMode
-  
-  /// The view's block rendering mode.
   @Environment(\.blockMode) private var blockMode
-  
-  /// Whether the view should process escapes.
   @Environment(\.processEscapes) private var processEscapes
-  
-  /// The view's rendering style.
   @Environment(\.renderingStyle) private var renderingStyle
-  
-  /// The rendering mode to use with the rendered MathJax images.
   @Environment(\.imageRenderingMode) private var imageRenderingMode
-  
-  /// The animation the view should apply to its rendered images.
   @Environment(\.renderingAnimation) private var renderingAnimation
-  
-  /// Whether string formatting such as markdown should be ignored or rendered.
   @Environment(\.ignoreStringFormatting) private var ignoreStringFormatting
-  
-  /// The view's current display scale.
   @Environment(\.displayScale) private var displayScale
-  
-  /// The view's font.
   @Environment(\.font) private var font
-  
-  /// The view's UI/NSFont font.
   @Environment(\.platformFont) private var platformFont
-
-  /// Fixed xHeight value for consistent rendering.
   @Environment(\.fixedXHeight) private var fixedXHeight
-
-  /// Fixed displayScale value for consistent rendering.
   @Environment(\.fixedDisplayScale) private var fixedDisplayScale
 
   // MARK: Private properties
-  
-  /// The view's renderer.
+
   @StateObject private var renderer = Renderer()
-  
-  /// The view's preload task, if any.
   @State private var preloadTask: Task<(), Never>?
-  
+  @State private var renderInvalidationKey: RenderInvalidationKey?
+
   // MARK: Initializers
-  
+
   /// Initializes a view with a LaTeX input string.
   ///
   /// - Parameter latex: The LaTeX input.
   public init(_ latex: String) {
     self.latex = latex
   }
-  
+
   // MARK: View body
-  
+
   public var body: some View {
     VStack(spacing: 0) {
       if renderer.rendered || renderer.syncRendered {
-        // If our blocks have been rendered, display them
         bodyWithBlocks(renderer.blocks)
       }
       else if isCached() {
-        // If our blocks are cached, display them
         bodyWithBlocks(renderSync())
       }
       else {
-        // The view is not rendered nor cached
         switch renderingStyle {
         case .empty, .original, .redactedOriginal, .progress:
-          // Render the components asynchronously
           loadingView().task {
             await renderAsync()
           }
         case .wait:
-          // Render the components synchronously
           bodyWithBlocks(renderSync())
         }
       }
     }
     .animation(renderingAnimation, value: renderer.rendered)
     .onDisappear(perform: preloadTask?.cancel)
-    // Add platform-specific modifiers for better rendering stability
+    .onAppear {
+      invalidateRendererIfNeeded()
+    }
+    .onChange(of: currentRenderInvalidationKey) { _ in
+      invalidateRendererIfNeeded()
+    }
     #if os(macOS)
-    .fixedSize(horizontal: false, vertical: true) // Help stabilize vertical height on macOS
-    .layoutPriority(1) // Give LaTeX views layout priority
+    .fixedSize(horizontal: false, vertical: true)
+    .layoutPriority(1)
     #endif
   }
-  
+
 }
 
-// MARK: Public methods
+// MARK: - Public Methods
 
 extension LaTeX {
-  
+
   /// Preloads the view's SVG and image data.
   public func preload() {
     preloadTask?.cancel()
     preloadTask = Task { await renderAsync() }
     Task { await preloadTask?.value }
   }
-  
+
   /// Configures the `LaTeX` view with the given style.
   ///
   /// - Parameter style: The `LaTeX` view style to use.
@@ -261,7 +156,7 @@ extension LaTeX {
   public func latexStyle<S>(_ style: S) -> some View where S: LaTeXStyle {
     style.makeBody(content: self)
   }
-  
+
 #if os(iOS) || os(visionOS)
   public func font(_ font: UIFont) -> some View {
     self
@@ -277,166 +172,76 @@ extension LaTeX {
 #endif
 }
 
-// MARK: Standard Configuration
+// MARK: - Private Methods
 
 extension LaTeX {
 
-  /// Applies the standard Brainblast LaTeX configuration with consistent rendering settings.
-  ///
-  /// This configuration includes:
-  /// - Fixed x-height for consistent sizing
-  /// - Fixed display scale for consistent rendering
-  /// - Equation-only parsing mode
-  /// - Block views rendering mode
-  /// - Synchronous rendering (wait mode)
-  /// - Custom block alignment
-  ///
-  /// - Parameters:
-  ///   - font: The font to use for rendering
-  ///   - fixedXHeightValue: The fixed x-height value for consistent sizing
-  ///   - fixedDisplayScale: The fixed display scale (defaults to 2.0)
-  ///   - latexBlockAlignment: The alignment for block equations (defaults to .center)
-  /// - Returns: A configured LaTeX view
-  public func standardConfiguration(
-    font: Font,
-    fixedXHeightValue: CGFloat,
-    fixedDisplayScale: CGFloat = 2.0,
-    latexBlockAlignment: BlockAlignment = .center
-  ) -> some View {
-    self
-      .font(font)
-      .fixedXHeight(fixedXHeightValue)
-      .fixedDisplayScale(fixedDisplayScale)
-      .parsingMode(.onlyEquations)
-      .blockMode(.blockViews)
-      .renderingStyle(.wait)
-      .blockAlignment(latexBlockAlignment)
+  var resolvedXHeight: CGFloat {
+    fixedXHeight ?? (platformFont?.xHeight ?? font?.xHeight) ?? Font.body.xHeight
   }
 
-#if os(iOS) || os(visionOS)
-  /// Applies the standard Brainblast LaTeX configuration with consistent rendering settings.
-  ///
-  /// This configuration includes:
-  /// - Fixed x-height for consistent sizing
-  /// - Fixed display scale for consistent rendering
-  /// - Equation-only parsing mode
-  /// - Block views rendering mode
-  /// - Synchronous rendering (wait mode)
-  /// - Custom block alignment
-  ///
-  /// - Parameters:
-  ///   - font: The UIFont to use for rendering
-  ///   - fixedXHeightValue: The fixed x-height value for consistent sizing
-  ///   - fixedDisplayScale: The fixed display scale (defaults to 2.0)
-  ///   - latexBlockAlignment: The alignment for block equations (defaults to .center)
-  /// - Returns: A configured LaTeX view
-  public func standardConfiguration(
-    font: UIFont,
-    fixedXHeightValue: CGFloat,
-    fixedDisplayScale: CGFloat = 2.0,
-    latexBlockAlignment: BlockAlignment = .center
-  ) -> some View {
-    self
-      .font(font)
-      .fixedXHeight(fixedXHeightValue)
-      .fixedDisplayScale(fixedDisplayScale)
-      .parsingMode(.onlyEquations)
-      .blockMode(.blockViews)
-      .renderingStyle(.wait)
-      .blockAlignment(latexBlockAlignment)
+  var resolvedDisplayScale: CGFloat {
+    fixedDisplayScale ?? displayScale
   }
-#else
-  /// Applies the standard Brainblast LaTeX configuration with consistent rendering settings.
-  ///
-  /// This configuration includes:
-  /// - Fixed x-height for consistent sizing
-  /// - Fixed display scale for consistent rendering
-  /// - Equation-only parsing mode
-  /// - Block views rendering mode
-  /// - Synchronous rendering (wait mode)
-  /// - Custom block alignment
-  ///
-  /// - Parameters:
-  ///   - font: The NSFont to use for rendering
-  ///   - fixedXHeightValue: The fixed x-height value for consistent sizing
-  ///   - fixedDisplayScale: The fixed display scale (defaults to 2.0)
-  ///   - latexBlockAlignment: The alignment for block equations (defaults to .center)
-  /// - Returns: A configured LaTeX view
-  public func standardConfiguration(
-    font: NSFont,
-    fixedXHeightValue: CGFloat,
-    fixedDisplayScale: CGFloat = 2.0,
-    latexBlockAlignment: BlockAlignment = .center
-  ) -> some View {
-    self
-      .font(font)
-      .fixedXHeight(fixedXHeightValue)
-      .fixedDisplayScale(fixedDisplayScale)
-      .parsingMode(.onlyEquations)
-      .blockMode(.blockViews)
-      .renderingStyle(.wait)
-      .blockAlignment(latexBlockAlignment)
+
+  var currentRenderInvalidationKey: RenderInvalidationKey {
+    RenderInvalidationKey(
+      latex: latex,
+      unencodeHTML: unencodeHTML,
+      parsingMode: parsingMode,
+      processEscapes: processEscapes,
+      errorMode: errorMode,
+      xHeight: resolvedXHeight,
+      displayScale: resolvedDisplayScale)
   }
-#endif
-}
 
-// MARK: Private methods
+  @MainActor private func invalidateRendererIfNeeded() {
+    let key = currentRenderInvalidationKey
+    guard renderInvalidationKey != key else { return }
+    renderInvalidationKey = key
+    renderer.invalidateRenderState()
+  }
 
-extension LaTeX {
-  
   /// Checks the renderer's caches for the current view.
-  ///
-  /// If this method returns `true`, then there is no need to do an async
-  /// render.
-  ///
-  /// - Returns: A boolean indicating whether the components to the view are
-  ///   cached.
   private func isCached() -> Bool {
-    let xHeight = fixedXHeight ?? (platformFont?.xHeight ?? font?.xHeight) ?? Font.body.xHeight
-    let scale = fixedDisplayScale ?? displayScale
     return renderer.isCached(
       latex: latex,
       unencodeHTML: unencodeHTML,
       parsingMode: parsingMode,
       processEscapes: processEscapes,
       errorMode: errorMode,
-      xHeight: xHeight,
-      displayScale: scale)
+      xHeight: resolvedXHeight,
+      displayScale: resolvedDisplayScale)
   }
-  
-  /// Renders the view's components.
+
+  /// Renders the view's components asynchronously.
   private func renderAsync() async {
-    let xHeight = fixedXHeight ?? (platformFont?.xHeight ?? font?.xHeight) ?? Font.body.xHeight
-    let scale = fixedDisplayScale ?? displayScale
     await renderer.render(
       latex: latex,
       unencodeHTML: unencodeHTML,
       parsingMode: parsingMode,
       processEscapes: processEscapes,
       errorMode: errorMode,
-      xHeight: xHeight,
-      displayScale: scale,
+      xHeight: resolvedXHeight,
+      displayScale: resolvedDisplayScale,
       renderingMode: imageRenderingMode)
   }
-  
+
   /// Renders the view's components synchronously.
   ///
   /// - Returns: The rendered components.
   private func renderSync() -> [ComponentBlock] {
-    let xHeight = fixedXHeight ?? (platformFont?.xHeight ?? font?.xHeight) ?? Font.body.xHeight
-    let scale = fixedDisplayScale ?? displayScale
-
     return renderer.renderSync(
       latex: latex,
       unencodeHTML: unencodeHTML,
       parsingMode: parsingMode,
       processEscapes: processEscapes,
       errorMode: errorMode,
-      xHeight: xHeight,
-      displayScale: scale,
+      xHeight: resolvedXHeight,
+      displayScale: resolvedDisplayScale,
       renderingMode: imageRenderingMode)
   }
-  
+
   /// Creates the view's body based on its block mode.
   ///
   /// - Parameter blocks: The blocks to display.
@@ -451,7 +256,7 @@ extension LaTeX {
       ComponentBlocksViews(blocks: blocks)
     }
   }
-  
+
   /// The view to display while its content is rendering.
   ///
   /// - Returns: The view's body.
@@ -469,5 +274,5 @@ extension LaTeX {
       EmptyView()
     }
   }
-  
+
 }

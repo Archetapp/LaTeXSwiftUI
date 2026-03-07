@@ -28,17 +28,17 @@ import Foundation
 import MathJaxSwift
 
 internal protocol CacheKey: Codable {
-  
+
   /// The key type used to identify the cache key in storage.
   static var keyType: String { get }
-  
+
   /// A key to use if encoding fails.
   var fallbackKey: String { get }
-  
+
 }
 
 extension CacheKey {
-  
+
   /// The key to use in the cache.
   internal func key() -> String {
     do {
@@ -50,13 +50,22 @@ extension CacheKey {
       return fallbackKey + "-" + Self.keyType
     }
   }
-  
+
 }
 
 internal class Cache {
-  
+
   // MARK: Types
-  
+
+  private enum Constants {
+    static let dataCacheCountLimit = 200
+    static let dataCacheTotalCostLimit = 50 * 1024 * 1024
+    static let imageCacheCountLimit = 100
+    static let imageCacheTotalCostLimit = 100 * 1024 * 1024
+    static let maxConsecutiveFailuresBeforeClear = 3
+    static let bytesPerPixelMultiplier = 4
+  }
+
   /// An SVG cache key.
   struct SVGCacheKey: CacheKey {
     static let keyType: String = "svg"
@@ -65,7 +74,7 @@ internal class Cache {
     let texOptions: TeXInputProcessorOptions
     internal var fallbackKey: String { componentText }
   }
-  
+
   /// An image cache key.
   struct ImageCacheKey: CacheKey {
     static let keyType: String = "image"
@@ -74,41 +83,43 @@ internal class Cache {
     let displayScale: CGFloat
     internal var fallbackKey: String { String(data: svg.data, encoding: .utf8) ?? "" }
   }
-  
+
   // MARK: Static properties
-  
+
   /// The shared cache.
   static let shared = Cache()
-  
+
   // MARK: Public properties
-  
+
   /// The renderer's data cache.
-  let dataCache: NSCache<NSString, NSData> = NSCache()
-  
+  let dataCache: NSCache<NSString, NSData> = {
+    let cache = NSCache<NSString, NSData>()
+    cache.countLimit = Constants.dataCacheCountLimit
+    cache.totalCostLimit = Constants.dataCacheTotalCostLimit
+    return cache
+  }()
+
   /// The renderer's image cache.
-  let imageCache: NSCache<NSString, _Image> = NSCache()
-  
+  let imageCache: NSCache<NSString, _Image> = {
+    let cache = NSCache<NSString, _Image>()
+    cache.countLimit = Constants.imageCacheCountLimit
+    cache.totalCostLimit = Constants.imageCacheTotalCostLimit
+    return cache
+  }()
+
   // MARK: Private properties
-  
-  /// The data cache queue.
+
   private let dataCacheQueue = DispatchQueue(label: "latexswiftui.cache.data")
-  
-  /// The image cache queue.
   private let imageCacheQueue = DispatchQueue(label: "latexswiftui.cache.image")
-  
-  /// Counter for consecutive rendering failures.
   private var _consecutiveFailures: Int = 0
   private let failureCountQueue = DispatchQueue(label: "latexswiftui.cache.failures")
-  
-  /// The maximum number of consecutive failures before clearing caches.
-  private let maxConsecutiveFailures = 3
-  
+
 }
 
-// MARK: Public methods
+// MARK: - Public Methods
 
 extension Cache {
-  
+
   /// Safely access the cache value for the given key.
   ///
   /// - Parameter key: The key of the value to get.
@@ -128,12 +139,13 @@ extension Cache {
   ///   - key: The value's key.
   func setDataCacheValue(_ value: Data, for key: SVGCacheKey) {
     let cacheKey = key.key()
+    let cost = value.count
     dataCacheQueue.async(flags: .barrier) { [weak self] in
       guard let self = self else { return }
-      self.dataCache.setObject(value as NSData, forKey: cacheKey as NSString)
+      self.dataCache.setObject(value as NSData, forKey: cacheKey as NSString, cost: cost)
     }
   }
-  
+
   /// Safely access the cache value for the given key.
   ///
   /// - Parameter key: The key of the value to get.
@@ -153,28 +165,33 @@ extension Cache {
   ///   - key: The value's key.
   func setImageCacheValue(_ value: _Image, for key: ImageCacheKey) {
     let cacheKey = key.key()
+    #if os(iOS) || os(visionOS)
+    let cost = Int(value.size.width * value.size.height * value.scale * CGFloat(Constants.bytesPerPixelMultiplier))
+    #else
+    let cost = Int(value.size.width * value.size.height * CGFloat(Constants.bytesPerPixelMultiplier))
+    #endif
     imageCacheQueue.async(flags: .barrier) { [weak self] in
       guard let self = self else { return }
-      self.imageCache.setObject(value, forKey: cacheKey as NSString)
+      self.imageCache.setObject(value, forKey: cacheKey as NSString, cost: cost)
     }
   }
-  
+
   /// Completely clears both caches.
   func clearAllCaches() {
     dataCacheQueue.async(flags: .barrier) { [weak self] in
       guard let self = self else { return }
       self.dataCache.removeAllObjects()
     }
-    
+
     imageCacheQueue.async(flags: .barrier) { [weak self] in
       guard let self = self else { return }
       self.imageCache.removeAllObjects()
     }
-    
+
     resetFailureCount()
     NSLog("LaTeXSwiftUI: Cleared all caches due to rendering issues")
   }
-  
+
   /// Records a rendering failure and clears caches if threshold is reached.
   ///
   /// - Returns: Whether caches were cleared due to consecutive failures.
@@ -182,8 +199,8 @@ extension Cache {
     return failureCountQueue.sync { [weak self] in
       guard let self = self else { return false }
       self._consecutiveFailures += 1
-      
-      if self._consecutiveFailures >= self.maxConsecutiveFailures {
+
+      if self._consecutiveFailures >= Constants.maxConsecutiveFailuresBeforeClear {
         DispatchQueue.global(qos: .utility).async { [weak self] in
           self?.clearAllCaches()
         }
@@ -192,12 +209,25 @@ extension Cache {
       return false
     }
   }
-  
+
   /// Records a successful rendering operation.
   func recordRenderingSuccess() {
     resetFailureCount()
   }
-  
+
+  /// Gets the current consecutive failure count.
+  var consecutiveFailures: Int {
+    return failureCountQueue.sync { [weak self] in
+      return self?._consecutiveFailures ?? 0
+    }
+  }
+
+}
+
+// MARK: - Private Methods
+
+extension Cache {
+
   /// Resets the consecutive failure counter.
   private func resetFailureCount() {
     failureCountQueue.async(flags: .barrier) { [weak self] in
@@ -205,12 +235,5 @@ extension Cache {
       self._consecutiveFailures = 0
     }
   }
-  
-  /// Gets the current consecutive failure count.
-  var consecutiveFailures: Int {
-    return failureCountQueue.sync { [weak self] in
-      return self?._consecutiveFailures ?? 0
-    }
-  }
-  
+
 }
