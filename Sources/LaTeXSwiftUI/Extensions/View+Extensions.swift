@@ -26,8 +26,8 @@
 import MathJaxSwift
 import SwiftUI
 
-public extension View {
-  
+extension View {
+
   /// Preloads a `LaTeX` view's SVG and image data.
   ///
   /// This method should be called last in the view's modifier chain (if at
@@ -46,54 +46,54 @@ public extension View {
   ///   nothing.
   ///
   /// - Returns: A preloaded view.
-  func preload() -> some View {
+  public func preload() -> some View {
     if let latex = self as? LaTeX {
       latex.preload()
     }
     return self
   }
-  
+
   /// Sets the image rendering mode for images rendered by MathJax.
   ///
   /// - Parameter mode: The template rendering mode.
   /// - Returns: A view that applies the template rendering mode to all of the
   ///   rendered images in the view.
-  func imageRenderingMode(_ mode: Image.TemplateRenderingMode) -> some View {
+  public func imageRenderingMode(_ mode: Image.TemplateRenderingMode) -> some View {
     environment(\.imageRenderingMode, mode)
   }
-  
+
   /// Sets the error mode for images rendered by MathJax that contain errors.
   ///
   /// - Parameter mode: The error mode.
   /// - Returns: A view that applies the error mode to its rendered images.
-  func errorMode(_ mode: LaTeX.ErrorMode) -> some View {
+  public func errorMode(_ mode: LaTeX.ErrorMode) -> some View {
     environment(\.errorMode, mode)
   }
-  
+
   /// Unencodes HTML input text.
   ///
   /// - Parameter unencode: Whether the variable should be set to true or false.
   /// - Returns: A view that displays unencoded text.
-  func unencoded(_ unencode: Bool = true) -> some View {
+  public func unencoded(_ unencode: Bool = true) -> some View {
     environment(\.unencodeHTML, unencode)
   }
-  
+
   /// Sets the parsing mode to use when parsing LaTeX input.
   ///
   /// - Parameter mode: The LaTeX parsing mode.
   /// - Returns: A view that utilizes the given parsing mode.
-  func parsingMode(_ mode: LaTeX.ParsingMode) -> some View {
+  public func parsingMode(_ mode: LaTeX.ParsingMode) -> some View {
     environment(\.parsingMode, mode)
   }
-  
+
   /// Sets the equation block mode for block equations rendered in this view.
   ///
   /// - Parameter mode: The block mode.
   /// - Returns: A view that applies the given block mode to block equations.
-  func blockMode(_ mode: LaTeX.BlockMode) -> some View {
+  public func blockMode(_ mode: LaTeX.BlockMode) -> some View {
     environment(\.blockMode, mode)
   }
-  
+
   /// When set to `true`, you may use `\$` to represent a literal dollar sign,
   /// rather than using it as a math delimiter, and `\\` to represent a literal
   /// backslash (so that you can use `\\\$` to get a literal `\$` or `\\$...$`
@@ -108,68 +108,68 @@ public extension View {
   ///
   /// - Parameter process: Whether escapes should be processed.
   /// - Returns: A view that processes escapes in its text input.
-  func processEscapes(_ process: Bool = true) -> some View {
+  public func processEscapes(_ process: Bool = true) -> some View {
     environment(\.processEscapes, process)
   }
-  
+
   /// Sets whether block view equation numbers should be hidden, displayed on
   /// the left side of an equation, or displayed on the right side.
   ///
   /// - Parameter mode: The equation number mode.
   /// - Returns: A view that numbers its equations.
-  func equationNumberMode(_ mode: LaTeX.EquationNumberMode) -> some View {
+  public func equationNumberMode(_ mode: LaTeX.EquationNumberMode) -> some View {
     environment(\.equationNumberMode, mode)
   }
-  
+
   /// Sets the starting value for equation numbers in this view.
   ///
   /// - Parameter value: The starting value.
   /// - Returns: A view that numbers its equations.
-  func equationNumberStart(_ value: Int) -> some View {
+  public func equationNumberStart(_ value: Int) -> some View {
     environment(\.equationNumberStart, value)
   }
-  
+
   /// Sets the number's left or right offset.
   ///
   /// - Parameter offset: The offset to set.
   /// - Returns: A view that numbers its equations.
-  func equationNumberOffset(_ offset: CGFloat) -> some View {
+  public func equationNumberOffset(_ offset: CGFloat) -> some View {
     environment(\.equationNumberOffset, offset)
   }
-  
+
   /// Sets a block that lets you format the equation number that will be
   /// displayed for named block equations.
   ///
   /// - Parameter perform: The block that will format the equation number.
   /// - Returns: A view that formats its equation numbers.
-  func formatEquationNumber(_ perform: @escaping LaTeX.FormatEquationNumber) -> some View {
+  public func formatEquationNumber(_ perform: @escaping LaTeX.FormatEquationNumber) -> some View {
     environment(\.formatEquationNumber, perform)
   }
-  
+
   /// Sets the view rendering style.
   ///
   /// - Parameter style: The rendering style to use.
   /// - Returns: A view that renders its content.
-  func renderingStyle(_ style: LaTeX.RenderingStyle) -> some View {
+  public func renderingStyle(_ style: LaTeX.RenderingStyle) -> some View {
     environment(\.renderingStyle, style)
   }
-  
+
   /// Sets the animation the view should apply to its rendered images.
   ///
   /// - Parameter animation: The animation.
   /// - Returns: A view that animates its rendered state.
-  func renderingAnimation(_ animation: Animation?) -> some View {
+  public func renderingAnimation(_ animation: Animation?) -> some View {
     environment(\.renderingAnimation, animation)
   }
-  
+
   /// Whether string formatting such as markdown should be ignored or rendered.
   ///
   /// - Parameter ignore: Ignore string formatting.
   /// - Returns: A view that ignores or renders string formatting.
-  func ignoreStringFormatting(_ ignore: Bool = true) -> some View {
+  public func ignoreStringFormatting(_ ignore: Bool = true) -> some View {
     environment(\.ignoreStringFormatting, ignore)
   }
-  
+
   /// Sets the view's UI/NSFont font, if any.
   /// - Parameter font: The UI/NSFont font to use.
   /// - Returns: A view that uses the provided font.
@@ -181,7 +181,7 @@ public extension View {
   ///
   /// - Parameter alignment: The block alignment to use.
   /// - Returns: A view that applies the alignment to block equations.
-  func blockAlignment(_ alignment: LaTeX.BlockAlignment) -> some View {
+  public func blockAlignment(_ alignment: LaTeX.BlockAlignment) -> some View {
     environment(\.blockAlignment, alignment)
   }
 

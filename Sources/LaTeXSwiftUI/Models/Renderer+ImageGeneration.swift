@@ -29,9 +29,9 @@ import SwiftDraw
 import SwiftUI
 
 #if os(iOS) || os(visionOS)
-import UIKit
+  import UIKit
 #else
-import Cocoa
+  import Cocoa
 #endif
 
 // MARK: - Image Generation
@@ -80,7 +80,7 @@ extension Renderer {
     retryCount: Int
   ) -> [ComponentBlock] {
     var newBlocks = [ComponentBlock]()
-    var hasRenderingFailures = false
+    let hasRenderingFailures = false
 
     for block in blocks {
       do {
@@ -92,8 +92,7 @@ extension Renderer {
           texOptions: texOptions)
 
         newBlocks.append(ComponentBlock(components: newComponents))
-      }
-      catch {
+      } catch {
         newBlocks.append(block)
         continue
       }
@@ -185,12 +184,14 @@ extension Renderer {
       for: component,
       defaultMode: renderingMode)
 
-    guard let image = getImage(
-      for: svg,
-      xHeight: xHeight,
-      displayScale: displayScale,
-      renderingMode: effectiveRenderingMode
-    ) else {
+    guard
+      let image = getImage(
+        for: svg,
+        xHeight: xHeight,
+        displayScale: displayScale,
+        renderingMode: effectiveRenderingMode
+      )
+    else {
       NSLog("LaTeXSwiftUI: Failed to generate image for component: \(component.text)")
       throw RenderingError.imageGenerationFailed
     }
@@ -310,7 +311,9 @@ extension Renderer {
   ) -> SwiftUI.Image? {
     let cacheKey = Cache.ImageCacheKey(svg: svg, xHeight: xHeight, displayScale: displayScale)
 
-    if let cachedImage = loadCachedImage(for: cacheKey, displayScale: displayScale, renderingMode: renderingMode) {
+    if let cachedImage = loadCachedImage(
+      for: cacheKey, displayScale: displayScale, renderingMode: renderingMode)
+    {
       return cachedImage
     }
 
@@ -352,112 +355,112 @@ extension Renderer {
     cacheKey: Cache.ImageCacheKey
   ) -> SwiftUI.Image? {
     #if os(iOS) || os(visionOS)
-    return rasterizeImageiOS(
-      svg: svg,
-      imageSize: imageSize,
-      displayScale: displayScale,
-      renderingMode: renderingMode,
-      cacheKey: cacheKey)
+      return rasterizeImageiOS(
+        svg: svg,
+        imageSize: imageSize,
+        displayScale: displayScale,
+        renderingMode: renderingMode,
+        cacheKey: cacheKey)
     #else
-    return rasterizeImageMacOS(
-      svg: svg,
-      imageSize: imageSize,
-      displayScale: displayScale,
-      renderingMode: renderingMode,
-      cacheKey: cacheKey)
+      return rasterizeImageMacOS(
+        svg: svg,
+        imageSize: imageSize,
+        displayScale: displayScale,
+        renderingMode: renderingMode,
+        cacheKey: cacheKey)
     #endif
   }
 
   #if os(iOS) || os(visionOS)
-  /// Rasterizes an SVG on iOS/visionOS.
-  private func rasterizeImageiOS(
-    svg: SVG,
-    imageSize: CGSize,
-    displayScale: CGFloat,
-    renderingMode: SwiftUI.Image.TemplateRenderingMode,
-    cacheKey: Cache.ImageCacheKey
-  ) -> SwiftUI.Image? {
-    guard let svgInstance = SwiftDraw.SVG(data: svg.data) else {
-      NSLog("LaTeXSwiftUI: Failed to create SwiftDraw SVG instance")
-      return nil
+    /// Rasterizes an SVG on iOS/visionOS.
+    private func rasterizeImageiOS(
+      svg: SVG,
+      imageSize: CGSize,
+      displayScale: CGFloat,
+      renderingMode: SwiftUI.Image.TemplateRenderingMode,
+      cacheKey: Cache.ImageCacheKey
+    ) -> SwiftUI.Image? {
+      guard let svgInstance = SwiftDraw.SVG(data: svg.data) else {
+        NSLog("LaTeXSwiftUI: Failed to create SwiftDraw SVG instance")
+        return nil
+      }
+
+      let image = svgInstance.rasterize(size: imageSize, scale: displayScale)
+
+      guard image.size.width > 0 && image.size.height > 0 else {
+        NSLog("LaTeXSwiftUI: Generated image has invalid size: \(image.size)")
+        return nil
+      }
+
+      Cache.shared.setImageCacheValue(image, for: cacheKey)
+
+      return Image(image: image, scale: displayScale)
+        .renderingMode(renderingMode)
+        .antialiased(true)
+        .interpolation(.high)
     }
-
-    let image = svgInstance.rasterize(size: imageSize, scale: displayScale)
-
-    guard image.size.width > 0 && image.size.height > 0 else {
-      NSLog("LaTeXSwiftUI: Generated image has invalid size: \(image.size)")
-      return nil
-    }
-
-    Cache.shared.setImageCacheValue(image, for: cacheKey)
-
-    return Image(image: image, scale: displayScale)
-      .renderingMode(renderingMode)
-      .antialiased(true)
-      .interpolation(.high)
-  }
   #endif
 
   #if os(macOS)
-  /// Rasterizes an SVG on macOS, with fallback for invalid sizes.
-  private func rasterizeImageMacOS(
-    svg: SVG,
-    imageSize: CGSize,
-    displayScale: CGFloat,
-    renderingMode: SwiftUI.Image.TemplateRenderingMode,
-    cacheKey: Cache.ImageCacheKey
-  ) -> SwiftUI.Image? {
-    guard let svgInstance = SwiftDraw.SVG(data: svg.data) else {
-      NSLog("LaTeXSwiftUI: Failed to create SwiftDraw SVG instance")
-      return nil
+    /// Rasterizes an SVG on macOS, with fallback for invalid sizes.
+    private func rasterizeImageMacOS(
+      svg: SVG,
+      imageSize: CGSize,
+      displayScale: CGFloat,
+      renderingMode: SwiftUI.Image.TemplateRenderingMode,
+      cacheKey: Cache.ImageCacheKey
+    ) -> SwiftUI.Image? {
+      guard let svgInstance = SwiftDraw.SVG(data: svg.data) else {
+        NSLog("LaTeXSwiftUI: Failed to create SwiftDraw SVG instance")
+        return nil
+      }
+
+      let scale = max(Constants.minimumDisplayScale, displayScale)
+      let image = svgInstance.rasterize(with: imageSize, scale: scale)
+
+      guard image.size.width > 0 && image.size.height > 0 else {
+        NSLog("LaTeXSwiftUI: Generated image has invalid size: \(image.size)")
+        return rasterizeFallbackImageMacOS(
+          svgInstance: svgInstance,
+          imageSize: imageSize,
+          scale: scale,
+          renderingMode: renderingMode,
+          cacheKey: cacheKey)
+      }
+
+      Cache.shared.setImageCacheValue(image, for: cacheKey)
+
+      return Image(image: image, scale: scale)
+        .renderingMode(renderingMode)
+        .antialiased(true)
+        .interpolation(.high)
     }
 
-    let scale = max(Constants.minimumDisplayScale, displayScale)
-    let image = svgInstance.rasterize(with: imageSize, scale: scale)
+    /// Attempts a fallback rasterization with minimum-clamped dimensions.
+    private func rasterizeFallbackImageMacOS(
+      svgInstance: SwiftDraw.SVG,
+      imageSize: CGSize,
+      scale: CGFloat,
+      renderingMode: SwiftUI.Image.TemplateRenderingMode,
+      cacheKey: Cache.ImageCacheKey
+    ) -> SwiftUI.Image? {
+      let fallbackSize = CGSize(
+        width: max(Constants.minimumImageDimension, imageSize.width),
+        height: max(Constants.minimumImageDimension, imageSize.height))
+      let fallbackImage = svgInstance.rasterize(with: fallbackSize, scale: scale)
 
-    guard image.size.width > 0 && image.size.height > 0 else {
-      NSLog("LaTeXSwiftUI: Generated image has invalid size: \(image.size)")
-      return rasterizeFallbackImageMacOS(
-        svgInstance: svgInstance,
-        imageSize: imageSize,
-        scale: scale,
-        renderingMode: renderingMode,
-        cacheKey: cacheKey)
+      guard fallbackImage.size.width > 0 && fallbackImage.size.height > 0 else {
+        NSLog("LaTeXSwiftUI: Fallback image generation also failed")
+        return nil
+      }
+
+      Cache.shared.setImageCacheValue(fallbackImage, for: cacheKey)
+
+      return Image(image: fallbackImage, scale: scale)
+        .renderingMode(renderingMode)
+        .antialiased(true)
+        .interpolation(.high)
     }
-
-    Cache.shared.setImageCacheValue(image, for: cacheKey)
-
-    return Image(image: image, scale: scale)
-      .renderingMode(renderingMode)
-      .antialiased(true)
-      .interpolation(.high)
-  }
-
-  /// Attempts a fallback rasterization with minimum-clamped dimensions.
-  private func rasterizeFallbackImageMacOS(
-    svgInstance: SwiftDraw.SVG,
-    imageSize: CGSize,
-    scale: CGFloat,
-    renderingMode: SwiftUI.Image.TemplateRenderingMode,
-    cacheKey: Cache.ImageCacheKey
-  ) -> SwiftUI.Image? {
-    let fallbackSize = CGSize(
-      width: max(Constants.minimumImageDimension, imageSize.width),
-      height: max(Constants.minimumImageDimension, imageSize.height))
-    let fallbackImage = svgInstance.rasterize(with: fallbackSize, scale: scale)
-
-    guard fallbackImage.size.width > 0 && fallbackImage.size.height > 0 else {
-      NSLog("LaTeXSwiftUI: Fallback image generation also failed")
-      return nil
-    }
-
-    Cache.shared.setImageCacheValue(fallbackImage, for: cacheKey)
-
-    return Image(image: fallbackImage, scale: scale)
-      .renderingMode(renderingMode)
-      .antialiased(true)
-      .interpolation(.high)
-  }
   #endif
 
   /// Gets the error text from a possibly non-nil error.
@@ -467,8 +470,7 @@ extension Renderer {
   private func getErrorText(from error: Error?) throws -> String? {
     if let mjError = error as? MathJaxError, case .conversionError(let innerError) = mjError {
       return innerError
-    }
-    else if let error = error {
+    } else if let error = error {
       throw error
     }
     return nil
