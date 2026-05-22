@@ -27,7 +27,7 @@ import Foundation
 import MathJaxSwift
 
 extension TeXInputProcessorOptions {
-  
+
   /// Initializes a set of options with the correct properties set for rendering
   /// a `LaTeX` view.
   ///
@@ -37,22 +37,24 @@ extension TeXInputProcessorOptions {
   convenience init(processEscapes: Bool, errorMode: LaTeX.ErrorMode) {
     self.init()
     self.processEscapes = processEscapes
-    
+
     var packages = TeXInputProcessorOptions.Packages.all
-    if errorMode != .rendered {
+    if errorMode != .rendered && errorMode != .renderedWithDiagnostic {
       if let noErrorsIndex = packages.firstIndex(of: TeXInputProcessorOptions.Packages.noerrors) {
         packages.remove(at: noErrorsIndex)
       }
-      if let noUndefinedIndex = packages.firstIndex(of: TeXInputProcessorOptions.Packages.noundefined) {
+      if let noUndefinedIndex = packages.firstIndex(
+        of: TeXInputProcessorOptions.Packages.noundefined)
+      {
         packages.remove(at: noUndefinedIndex)
       }
     }
     loadPackages = packages
-    
+
     // The default inlineMath for MathJax is set to [["\\(", "\\)"]] which isn't
     // useful for this package since we'd rather use dollar signs and reserve
     // parentheses for grouping symbols.
     inlineMath = [["$", "$"]]
   }
-  
+
 }

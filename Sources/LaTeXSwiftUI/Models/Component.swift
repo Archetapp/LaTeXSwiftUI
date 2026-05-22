@@ -29,48 +29,48 @@ import SwiftUI
 
 /// A LaTeX component.
 internal struct Component: CustomStringConvertible, Equatable, Hashable {
-  
+
   /// A LaTeX component type.
   enum ComponentType: String, Equatable, CustomStringConvertible {
-    
+
     /// A text component.
     case text
-    
+
     /// An inline equation component.
     ///
     /// - Example: `$x^2$`
     case inlineEquation
-    
+
     /// An inline equation component.
     ///
     /// - Example: `\(x^2\)`
     case inlineParenthesesEquation
-    
+
     /// A TeX-style block equation.
     ///
     /// - Example: `$$x^2$$`.
     case texEquation
-    
+
     /// A block equation.
     ///
     /// - Example: `\[x^2\]`
     case blockEquation
-    
+
     /// A named equation component.
     ///
     /// - Example: `\begin{equation}x^2\end{equation}`
     case namedEquation
-    
+
     /// A named equation component.
     ///
     /// - Example: `\begin{equation*}x^2\end{equation*}`
     case namedNoNumberEquation
-    
+
     /// The component's description.
     var description: String {
       rawValue
     }
-    
+
     /// The order we should scan components when parsing.
     static let order: [ComponentType] = [
       .namedNoNumberEquation,
@@ -78,9 +78,9 @@ internal struct Component: CustomStringConvertible, Equatable, Hashable {
       .blockEquation,
       .texEquation,
       .inlineEquation,
-      .inlineParenthesesEquation
+      .inlineParenthesesEquation,
     ]
-    
+
     /// The component's left terminator.
     var leftTerminator: String? {
       switch self {
@@ -93,7 +93,7 @@ internal struct Component: CustomStringConvertible, Equatable, Hashable {
       case .namedNoNumberEquation: return "\\begin{equation*}"
       }
     }
-    
+
     /// The component's right terminator.
     var rightTerminator: String? {
       switch self {
@@ -106,7 +106,7 @@ internal struct Component: CustomStringConvertible, Equatable, Hashable {
       case .namedNoNumberEquation: return "\\end{equation*}"
       }
     }
-    
+
     /// Whether or not this component is inline.
     var inline: Bool {
       switch self {
@@ -114,47 +114,47 @@ internal struct Component: CustomStringConvertible, Equatable, Hashable {
       default: return false
       }
     }
-    
+
     /// True iff the component is not `text`.
     var isEquation: Bool {
       return self != .text
     }
   }
-  
+
   /// The component's inner text.
   let text: String
-  
+
   /// The component's type.
   let type: ComponentType
-  
+
   /// The component's SVG image.
   let svg: SVG?
-  
+
   /// The component's image in its container.
   let imageContainer: ImageContainer?
-  
+
   /// The original input text that created this component.
   var originalText: String {
     "\(type.leftTerminator ?? "")\(text)\(type.rightTerminator ?? "")"
   }
-  
+
   /// The component's original text with newlines trimmed.
   var originalTextTrimmingNewlines: String {
     originalText.trimmingCharacters(in: .newlines)
   }
-  
+
   /// The component's conversion options.
   var conversionOptions: ConversionOptions {
     ConversionOptions(display: !type.inline)
   }
-  
+
   /// The component's description.
   var description: String {
     return "(\(type), \"\(text)\")"
   }
-  
+
   // MARK: Initializers
-  
+
   /// Initializes a component.
   ///
   /// The text passed to the component is stripped of the left and right
@@ -175,20 +175,19 @@ internal struct Component: CustomStringConvertible, Equatable, Hashable {
         text = String(text[..<text.index(text.endIndex, offsetBy: -rightTerminator.count)])
       }
       self.text = text
-    }
-    else {
+    } else {
       self.text = text
     }
-    
+
     self.type = type
     self.svg = svg
     self.imageContainer = imageContainer
   }
-  
+
 }
 
 extension Component {
-  
+
   /// Converts the component to a `Text` view.
   ///
   /// - Parameters:
@@ -214,49 +213,51 @@ extension Component {
     let text: Text
     if let svg = svg {
       // Do we have an error?
-      if let errorText = svg.errorText, errorMode != .rendered {
+      if let errorText = svg.errorText,
+        errorMode != .rendered,
+        errorMode != .renderedWithDiagnostic
+      {
         switch errorMode {
         case .original:
           // Use the original tex input
-          text = Text(blockRenderingMode == .alwaysInline ? originalTextTrimmingNewlines : originalText)
+          text = Text(
+            blockRenderingMode == .alwaysInline ? originalTextTrimmingNewlines : originalText)
         case .error:
           // Use the error text
           text = Text(errorText)
         default:
           text = Text("")
         }
-      }
-      else if let imageContainer {
+      } else if let imageContainer {
         #if os(iOS) || os(visionOS)
-        // Standard iOS behavior
-        let offset = svg.geometry.verticalAlignment.toPoints(xHeight)
-        text = Text(imageContainer.image).baselineOffset(blockRenderingMode == .alwaysInline || !isInEquationBlock ? offset : 0)
+          // Standard iOS behavior
+          let offset = svg.geometry.verticalAlignment.toPoints(xHeight)
+          text = Text(imageContainer.image).baselineOffset(
+            blockRenderingMode == .alwaysInline || !isInEquationBlock ? offset : 0)
         #else
-        // Modified macOS behavior
-        let offset = svg.geometry.verticalAlignment.toPoints(xHeight)
-        
-        // Create a more stable text view with the image
-        let baseText = Text(imageContainer.image)
-          .baselineOffset(blockRenderingMode == .alwaysInline || !isInEquationBlock ? offset : 0)
-        
-        // On macOS, we add empty text elements to help stabilize the layout
-        text = Text("").font(.system(size: 0.1)) + baseText + Text("").font(.system(size: 0.1))
+          // Modified macOS behavior
+          let offset = svg.geometry.verticalAlignment.toPoints(xHeight)
+
+          // Create a more stable text view with the image
+          let baseText = Text(imageContainer.image)
+            .baselineOffset(blockRenderingMode == .alwaysInline || !isInEquationBlock ? offset : 0)
+
+          // On macOS, we add empty text elements to help stabilize the layout
+          text = Text("").font(.system(size: 0.1)) + baseText + Text("").font(.system(size: 0.1))
         #endif
-      }
-      else {
+      } else {
         text = Text("")
       }
-    }
-    else if blockRenderingMode == .alwaysInline {
-      text = formattedText(input: originalTextTrimmingNewlines, ignoreStringFormatting: ignoreStringFormatting)
-    }
-    else {
+    } else if blockRenderingMode == .alwaysInline {
+      text = formattedText(
+        input: originalTextTrimmingNewlines, ignoreStringFormatting: ignoreStringFormatting)
+    } else {
       text = formattedText(input: originalText, ignoreStringFormatting: ignoreStringFormatting)
     }
-    
+
     return text
   }
-  
+
   /// Formats the input text and returns a text view.
   ///
   /// - Parameters:
@@ -266,20 +267,19 @@ extension Component {
   func formattedText(input: String, ignoreStringFormatting: Bool) -> Text {
     if ignoreStringFormatting {
       return Text(input)
-    }
-    else {
+    } else {
       do {
-        return Text(try AttributedString(
-          markdown: input,
-          options: AttributedString.MarkdownParsingOptions(
-            allowsExtendedAttributes: true,
-            interpretedSyntax: .inlineOnlyPreservingWhitespace,
-            failurePolicy: .returnPartiallyParsedIfPossible)))
-      }
-      catch {
+        return Text(
+          try AttributedString(
+            markdown: input,
+            options: AttributedString.MarkdownParsingOptions(
+              allowsExtendedAttributes: true,
+              interpretedSyntax: .inlineOnlyPreservingWhitespace,
+              failurePolicy: .returnPartiallyParsedIfPossible)))
+      } catch {
         return Text(input)
       }
     }
   }
-  
+
 }

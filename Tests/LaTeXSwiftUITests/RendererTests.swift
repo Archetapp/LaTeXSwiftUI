@@ -64,6 +64,94 @@ struct RendererTests {
         #expect(blocks.count >= 1)
     }
 
+    @Test("numeric-base exponent normalization adds harmless TeX spacing")
+    func normalizeNumericBaseExponentsForMathJax() {
+        #expect(Renderer.normalizeNumericBaseExponentsForMathJax("3^4") == "3 ^4")
+        #expect(Renderer.normalizeNumericBaseExponentsForMathJax("3^{t/4}") == "3 ^{t/4}")
+        #expect(
+            Renderer.normalizeNumericBaseExponentsForMathJax("B(t) = 500 \\cdot 3^{\\frac{t}{4}}")
+                == "B(t) = 500 \\cdot 3 ^{\\frac{t}{4}}"
+        )
+        #expect(
+            Renderer.normalizeNumericBaseExponentsForMathJax("x^2 + (3)^2 + 3 ^2")
+                == "x^2 + (3)^2 + 3 ^2"
+        )
+        #expect(
+            Renderer.normalizeNumericBaseExponentsForMathJax("\\text{3^4} + 3^4")
+                == "\\text{3^4} + 3 ^4"
+        )
+    }
+
+    @Test("renderSync renders numeric-base exponents")
+    @MainActor func renderSyncNumericBaseExponents() {
+        for latex in [
+            "$$3^4$$",
+            "$$3^{t/4}$$",
+            "$$B(t) = 500 \\cdot 3^{\\frac{t}{4}}$$",
+            "$$= 500 \\cdot 3^1$$"
+        ] {
+            let renderer = Renderer()
+            let blocks = renderer.renderSync(
+                latex: latex,
+                unencodeHTML: false,
+                parsingMode: .onlyEquations,
+                processEscapes: false,
+                errorMode: .original,
+                xHeight: 8,
+                displayScale: 2,
+                renderingMode: .template
+            )
+
+            let equations = blocks.flatMap(\.components).filter { $0.type.isEquation }
+            #expect(equations.count == 1)
+            #expect(equations.first?.svg != nil)
+            #expect(equations.first?.svg?.errorText == nil)
+            #expect(equations.first?.imageContainer != nil)
+        }
+    }
+
+    @Test("renderSync renders sqrt inline equation")
+    @MainActor func renderSyncSqrtInlineEquation() {
+        let renderer = Renderer()
+        let blocks = renderer.renderSync(
+            latex: "$7\\sqrt{6}$",
+            unencodeHTML: false,
+            parsingMode: .onlyEquations,
+            processEscapes: false,
+            errorMode: .original,
+            xHeight: 8,
+            displayScale: 2,
+            renderingMode: .template
+        )
+
+        let equations = blocks.flatMap(\.components).filter { $0.type.isEquation }
+        #expect(equations.count == 1)
+        #expect(equations.first?.svg != nil)
+        #expect(equations.first?.svg?.errorText == nil)
+        #expect(equations.first?.imageContainer != nil)
+    }
+
+    @Test("renderSync renders textcolor with sqrt inline equation")
+    @MainActor func renderSyncTextcolorSqrtInlineEquation() {
+        let renderer = Renderer()
+        let blocks = renderer.renderSync(
+            latex: "$\\textcolor{#007AFF}{7}\\sqrt{5}$",
+            unencodeHTML: false,
+            parsingMode: .onlyEquations,
+            processEscapes: false,
+            errorMode: .original,
+            xHeight: 8,
+            displayScale: 2,
+            renderingMode: .template
+        )
+
+        let equations = blocks.flatMap(\.components).filter { $0.type.isEquation }
+        #expect(equations.count == 1)
+        #expect(equations.first?.svg != nil)
+        #expect(equations.first?.svg?.errorText == nil)
+        #expect(equations.first?.imageContainer != nil)
+    }
+
     @Test("parseBlocks with all mode wraps as equation")
     func parseBlocksAllMode() {
         let renderer = Renderer()

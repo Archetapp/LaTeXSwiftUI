@@ -273,10 +273,11 @@ extension Renderer {
       throw RenderingError.mathJaxUnavailable
     }
 
+    let texInput = Self.normalizeNumericBaseExponentsForMathJax(component.text)
     var conversionError: Error?
     let svgString = MathJax.renderQueue.sync {
       mathjax.tex2svg(
-        component.text,
+        texInput,
         styles: false,
         conversionOptions: component.conversionOptions,
         inputOptions: texOptions,
@@ -293,6 +294,92 @@ extension Renderer {
     }
 
     return svg
+  }
+
+  /// MathJaxSwift's bridge can leave the caret visible when a numeric atom is
+  /// immediately followed by `^`. TeX ignores spaces in math mode, so `3 ^4`
+  /// preserves rendering while avoiding that bridge edge case.
+  static func normalizeNumericBaseExponentsForMathJax(_ text: String) -> String {
+    normalizeNumericBaseExponentsForMathJax(text, textLikeCommands: ["mbox", "text"])
+  }
+
+  private static func normalizeNumericBaseExponentsForMathJax(
+    _ text: String,
+    textLikeCommands: Set<String>
+  ) -> String {
+    var result = ""
+    result.reserveCapacity(text.count)
+
+    var index = text.startIndex
+    var braceDepth = 0
+    var textModeDepths: [Int] = []
+
+    while index < text.endIndex {
+      let char = text[index]
+      let next = text.index(after: index)
+
+      if char == "\\" {
+        let commandStart = next
+        var commandEnd = commandStart
+        while commandEnd < text.endIndex, text[commandEnd].isLetter {
+          commandEnd = text.index(after: commandEnd)
+        }
+
+        if commandEnd > commandStart {
+          let command = String(text[commandStart..<commandEnd])
+          result.append("\\")
+          result.append(command)
+          index = commandEnd
+
+          if textLikeCommands.contains(command) {
+            while index < text.endIndex, text[index].isWhitespace {
+              result.append(text[index])
+              index = text.index(after: index)
+            }
+
+            if index < text.endIndex, text[index] == "{" {
+              braceDepth += 1
+              textModeDepths.append(braceDepth)
+              result.append("{")
+              index = text.index(after: index)
+            }
+          }
+          continue
+        }
+
+        result.append(char)
+        if next < text.endIndex {
+          result.append(text[next])
+          index = text.index(after: next)
+        } else {
+          index = next
+        }
+        continue
+      }
+
+      if char == "^",
+        textModeDepths.isEmpty,
+        index > text.startIndex,
+        text[text.index(before: index)].isNumber
+      {
+        result.append(" ")
+      }
+
+      result.append(char)
+
+      if char == "{" {
+        braceDepth += 1
+      } else if char == "}" {
+        if textModeDepths.last == braceDepth {
+          textModeDepths.removeLast()
+        }
+        braceDepth = max(0, braceDepth - 1)
+      }
+
+      index = next
+    }
+
+    return result
   }
 
   /// Gets the component's image, checking the cache first.

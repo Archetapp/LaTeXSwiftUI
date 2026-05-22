@@ -70,6 +70,11 @@ extension LaTeX {
 
     /// The error text should be displayed.
     case error
+
+    /// Render the equation leniently (keep MathJax's `noerrors`/`noundefined`
+    /// extensions loaded) and display MathJax's error text in red beneath the
+    /// rendered output when something fails to parse. Brainblast addition.
+    case renderedWithDiagnostic
   }
 
   /// The view's rendering mode.
@@ -175,54 +180,54 @@ extension LaTeX {
       .blockAlignment(latexBlockAlignment)
   }
 
-#if os(iOS) || os(visionOS)
-  /// Applies the standard Brainblast LaTeX configuration using a UIFont.
-  ///
-  /// - Parameters:
-  ///   - font: The UIFont to use for rendering
-  ///   - fixedXHeightValue: The fixed x-height value for consistent sizing
-  ///   - fixedDisplayScale: The fixed display scale (defaults to 2.0)
-  ///   - latexBlockAlignment: The alignment for block equations (defaults to .center)
-  /// - Returns: A configured LaTeX view
-  public func standardConfiguration(
-    font: UIFont,
-    fixedXHeightValue: CGFloat,
-    fixedDisplayScale: CGFloat = ConfigurationDefaults.displayScale,
-    latexBlockAlignment: BlockAlignment = .center
-  ) -> some View {
-    self
-      .font(font)
-      .fixedXHeight(fixedXHeightValue)
-      .fixedDisplayScale(fixedDisplayScale)
-      .parsingMode(.onlyEquations)
-      .blockMode(.blockViews)
-      .renderingStyle(.wait)
-      .blockAlignment(latexBlockAlignment)
-  }
-#else
-  /// Applies the standard Brainblast LaTeX configuration using an NSFont.
-  ///
-  /// - Parameters:
-  ///   - font: The NSFont to use for rendering
-  ///   - fixedXHeightValue: The fixed x-height value for consistent sizing
-  ///   - fixedDisplayScale: The fixed display scale (defaults to 2.0)
-  ///   - latexBlockAlignment: The alignment for block equations (defaults to .center)
-  /// - Returns: A configured LaTeX view
-  public func standardConfiguration(
-    font: NSFont,
-    fixedXHeightValue: CGFloat,
-    fixedDisplayScale: CGFloat = ConfigurationDefaults.displayScale,
-    latexBlockAlignment: BlockAlignment = .center
-  ) -> some View {
-    self
-      .font(font)
-      .fixedXHeight(fixedXHeightValue)
-      .fixedDisplayScale(fixedDisplayScale)
-      .parsingMode(.onlyEquations)
-      .blockMode(.blockViews)
-      .renderingStyle(.wait)
-      .blockAlignment(latexBlockAlignment)
-  }
-#endif
+  #if os(iOS) || os(visionOS)
+    /// Applies the standard Brainblast LaTeX configuration using a UIFont.
+    ///
+    /// - Parameters:
+    ///   - font: The UIFont to use for rendering
+    ///   - fixedXHeightValue: The fixed x-height value for consistent sizing
+    ///   - fixedDisplayScale: The fixed display scale (defaults to 2.0)
+    ///   - latexBlockAlignment: The alignment for block equations (defaults to .center)
+    /// - Returns: A configured LaTeX view
+    public func standardConfiguration(
+      font: UIFont,
+      fixedXHeightValue: CGFloat,
+      fixedDisplayScale: CGFloat = ConfigurationDefaults.displayScale,
+      latexBlockAlignment: BlockAlignment = .center
+    ) -> some View {
+      self
+        .font(font)
+        .fixedXHeight(fixedXHeightValue)
+        .fixedDisplayScale(fixedDisplayScale)
+        .parsingMode(.onlyEquations)
+        .blockMode(.blockViews)
+        .renderingStyle(.wait)
+        .blockAlignment(latexBlockAlignment)
+    }
+  #else
+    /// Applies the standard Brainblast LaTeX configuration using an NSFont.
+    ///
+    /// - Parameters:
+    ///   - font: The NSFont to use for rendering
+    ///   - fixedXHeightValue: The fixed x-height value for consistent sizing
+    ///   - fixedDisplayScale: The fixed display scale (defaults to 2.0)
+    ///   - latexBlockAlignment: The alignment for block equations (defaults to .center)
+    /// - Returns: A configured LaTeX view
+    public func standardConfiguration(
+      font: NSFont,
+      fixedXHeightValue: CGFloat,
+      fixedDisplayScale: CGFloat = ConfigurationDefaults.displayScale,
+      latexBlockAlignment: BlockAlignment = .center
+    ) -> some View {
+      self
+        .font(font)
+        .fixedXHeight(fixedXHeightValue)
+        .fixedDisplayScale(fixedDisplayScale)
+        .parsingMode(.onlyEquations)
+        .blockMode(.blockViews)
+        .renderingStyle(.wait)
+        .blockAlignment(latexBlockAlignment)
+    }
+  #endif
 
 }

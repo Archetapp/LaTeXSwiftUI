@@ -25,22 +25,56 @@
 
 import SwiftUI
 
-/// A view that contains an image that can be scrolled horizontally.
+/// A view that scales a display equation image before falling back to horizontal scrolling.
 internal struct HorizontalImageScroller: View {
   
   /// The image to display.
   let image: Image
   
-  /// The height of the image.
-  let height: CGFloat
+  /// The intrinsic size of the rendered image.
+  let size: CGSize
   
   /// Whether the scroll view should show its indicators.
-  var showsIndicators: Bool = false
-  
+  var showsIndicators: Bool = true
+
+  /// The smallest readable scale before horizontal scrolling takes over.
+  var minimumScaleFactor: CGFloat = DisplayEquationImageSizing.minimumScaleFactor
+
   // MARK: View body
   
   var body: some View {
+    if #available(iOS 16, macOS 13, *) {
+      ViewThatFits(in: .horizontal) {
+        fixedImage
+        scaledImage(scaleFactor: 0.9)
+        scaledImage(scaleFactor: 0.8)
+        scaledImage(scaleFactor: 0.7)
+        scaledImage(scaleFactor: minimumScaleFactor)
+        ScrollView(.horizontal, showsIndicators: showsIndicators) {
+          scaledImage(scaleFactor: minimumScaleFactor)
+        }
+      }
+      .frame(maxWidth: .infinity, alignment: .center)
+    } else {
+      ScrollView(.horizontal, showsIndicators: showsIndicators) {
+        scaledImage(scaleFactor: minimumScaleFactor)
+      }
+    }
+  }
+
+  private var fixedImage: some View {
     image
-      .frame(height: height)
+      .frame(width: size.width, height: size.height)
+  }
+
+  private func scaledImage(scaleFactor: CGFloat) -> some View {
+    let scaleFactor = min(max(scaleFactor, 0.01), 1)
+    return image
+      .resizable()
+      .aspectRatio(size, contentMode: .fit)
+      .frame(
+        width: size.width * scaleFactor,
+        height: size.height * scaleFactor
+      )
   }
 }

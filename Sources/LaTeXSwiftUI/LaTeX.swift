@@ -38,17 +38,17 @@ public struct LaTeX: View {
     Cache.shared.dataCache
   }
 
-#if os(macOS)
-  /// The package's shared image cache.
-  public static var imageCache: NSCache<NSString, NSImage> {
-    Cache.shared.imageCache
-  }
-#else
-  /// The package's shared image cache.
-  public static var imageCache: NSCache<NSString, UIImage> {
-    Cache.shared.imageCache
-  }
-#endif
+  #if os(macOS)
+    /// The package's shared image cache.
+    public static var imageCache: NSCache<NSString, NSImage> {
+      Cache.shared.imageCache
+    }
+  #else
+    /// The package's shared image cache.
+    public static var imageCache: NSCache<NSString, UIImage> {
+      Cache.shared.imageCache
+    }
+  #endif
 
   /// Releases the MathJax renderer instance to free memory (~512MB).
   ///
@@ -103,22 +103,33 @@ public struct LaTeX: View {
   // MARK: View body
 
   public var body: some View {
-    VStack(spacing: 0) {
-      if renderer.rendered || renderer.syncRendered {
-        bodyWithBlocks(renderer.blocks)
-      }
-      else if isCached() {
-        bodyWithBlocks(renderSync())
-      }
-      else {
-        switch renderingStyle {
-        case .empty, .original, .redactedOriginal, .progress:
-          loadingView().task {
-            await renderAsync()
-          }
-        case .wait:
+    VStack(alignment: .leading, spacing: 0) {
+      VStack(spacing: 0) {
+        if renderer.rendered || renderer.syncRendered {
+          bodyWithBlocks(renderer.blocks)
+        } else if isCached() {
           bodyWithBlocks(renderSync())
+        } else {
+          switch renderingStyle {
+          case .empty, .original, .redactedOriginal, .progress:
+            loadingView().task {
+              await renderAsync()
+            }
+          case .wait:
+            bodyWithBlocks(renderSync())
+          }
         }
+      }
+
+      if errorMode == .renderedWithDiagnostic,
+        renderer.rendered || renderer.syncRendered,
+        let combinedErrorText = combinedRendererErrorText
+      {
+        Text(combinedErrorText)
+          .font(.system(size: 11, weight: .medium, design: .monospaced))
+          .foregroundColor(Color(.sRGB, red: 0.86, green: 0.16, blue: 0.16, opacity: 1))
+          .multilineTextAlignment(.leading)
+          .padding(.top, 4)
       }
     }
     .animation(renderingAnimation, value: renderer.rendered)
@@ -130,9 +141,21 @@ public struct LaTeX: View {
       invalidateRendererIfNeeded()
     }
     #if os(macOS)
-    .fixedSize(horizontal: false, vertical: true)
-    .layoutPriority(1)
+      .fixedSize(horizontal: false, vertical: true)
+      .layoutPriority(1)
     #endif
+  }
+
+  /// Joined MathJax error messages produced for the current render. Used by
+  /// `.renderedWithDiagnostic` to annotate the rendered output. Returns `nil`
+  /// when no component produced an error.
+  @MainActor private var combinedRendererErrorText: String? {
+    let messages = renderer.blocks
+      .flatMap { $0.components }
+      .compactMap { $0.svg?.errorText }
+      .filter { !$0.isEmpty }
+    guard !messages.isEmpty else { return nil }
+    return messages.joined(separator: "\n")
   }
 
 }
@@ -152,24 +175,27 @@ extension LaTeX {
   ///
   /// - Parameter style: The `LaTeX` view style to use.
   /// - Returns: A stylized view.
-  @available(*, deprecated, message: "This will be removed in a following version. Use other modifiers to set your style.")
+  @available(
+    *, deprecated,
+    message: "This will be removed in a following version. Use other modifiers to set your style."
+  )
   public func latexStyle<S>(_ style: S) -> some View where S: LaTeXStyle {
     style.makeBody(content: self)
   }
 
-#if os(iOS) || os(visionOS)
-  public func font(_ font: UIFont) -> some View {
-    self
-      .platformFont(font)
-      .font(Font(font))
-  }
-#else
-  public func font(_ font: NSFont) -> some View {
-    self
-      .platformFont(font)
-      .font(Font(font))
-  }
-#endif
+  #if os(iOS) || os(visionOS)
+    public func font(_ font: UIFont) -> some View {
+      self
+        .platformFont(font)
+        .font(Font(font))
+    }
+  #else
+    public func font(_ font: NSFont) -> some View {
+      self
+        .platformFont(font)
+        .font(Font(font))
+    }
+  #endif
 }
 
 // MARK: - Private Methods

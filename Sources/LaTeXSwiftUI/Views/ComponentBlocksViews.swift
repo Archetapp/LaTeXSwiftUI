@@ -80,7 +80,10 @@ internal struct ComponentBlocksViews: View {
             HStack(spacing: 0) {
               EquationNumber(blockIndex: blocks.filter({ $0.isEquationBlock }).firstIndex(of: block) ?? 0, side: .left)
 
-              if let errorText = svg.errorText, errorMode != .rendered {
+              if let errorText = svg.errorText,
+                errorMode != .rendered,
+                errorMode != .renderedWithDiagnostic
+              {
                 switch errorMode {
                 case .error:
                   Text(errorText)
@@ -93,7 +96,8 @@ internal struct ComponentBlocksViews: View {
               else {
                 HorizontalImageScroller(
                   image: container.image,
-                  height: container.size.size.height)
+                  size: container.size.size)
+                  .frame(maxWidth: .infinity)
               }
 
               EquationNumber(blockIndex: blocks.filter({ $0.isEquationBlock }).firstIndex(of: block) ?? 0, side: .right)
