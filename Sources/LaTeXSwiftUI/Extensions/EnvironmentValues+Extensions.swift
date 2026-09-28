@@ -67,7 +67,7 @@ private struct FormatEquationNumberKey: EnvironmentKey {
 }
 
 private struct RenderingStyleKey: EnvironmentKey {
-  static let defaultValue: LaTeX.RenderingStyle = .wait
+  static let defaultValue: LaTeX.RenderingStyle = .original
 }
 
 private struct RenderingAnimationKey: EnvironmentKey {

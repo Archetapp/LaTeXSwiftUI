@@ -1,5 +1,6 @@
 import Testing
 import Foundation
+import SwiftUI
 @testable import LaTeXSwiftUI
 
 @Suite("LaTeX Configuration Tests")
@@ -43,6 +44,12 @@ struct ConfigurationTests {
     func renderingStyleCases() {
         let styles: [LaTeX.RenderingStyle] = [.empty, .original, .redactedOriginal, .progress, .wait]
         #expect(styles.count == 5)
+    }
+
+    @Test("Default rendering style is nonblocking")
+    func defaultRenderingStyleIsOriginal() {
+        let environment = EnvironmentValues()
+        #expect(environment.renderingStyle == .original)
     }
 
     // MARK: - BlockAlignment

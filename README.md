@@ -71,6 +71,30 @@ struct MyView: View {
 
 > <img src="./assets/images/hello.png" width="85" height="21.5">
 
+### Script lowercase ell
+
+Use `\ell` in math mode for the script lowercase letter **ℓ**, which distinguishes
+length from the digit **1**. Use a Swift raw string or escape the backslash:
+
+```swift
+LaTeX(#"A rectangle has perimeter $52 = 2\ell + 2w$ and length $\ell = 8$."#)
+LaTeX(#"$$52 = 2\ell + 2w$$"#)
+LaTeX("$\\ell = 8$")
+LaTeX(#"$\ell^2$, $\ell_1$, and $\ell_{1}^{2}$"#)
+```
+
+Here the width is `w = 18`. MathJax already supplies the `\ell` command, its math
+glyph, spacing, baseline, and script layout; no replacement font or macro is
+needed. LaTeXSwiftUI preserves that rendering and labels equations containing
+`\ell` (or literal `ℓ`) with “letter ell” for accessibility. This is a source-based
+label, not a full TeX-to-speech translation; callers can supply a complete spoken
+equation with `.accessibilityLabel(...)` when needed. Ordinary `l` and existing
+question content are unchanged.
+
+The “Script lowercase ell” preview shows inline, display, and scripted examples.
+`EllSymbolTests` covers delimiter parsing, rendering, glyph identity, geometry,
+scripts, and the spoken label.
+
 ### Fonts
 
 The view needs to be able to measure the current font's x-height to correctly size the characters inside of the rendered LaTeX SVG. To do that, the view must use the `UIFont`/`NSFont` classes and do its best to convert SwiftUI's `Font` structure into the correct `UIFont` instance. Currently, the view's functionality is limited to SwiftUI's static largeTitle, title, title1, headline, etc fonts, or by using `UIFont`/`NSFont` types directly.

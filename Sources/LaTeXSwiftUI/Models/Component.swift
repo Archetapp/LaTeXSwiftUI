@@ -255,6 +255,9 @@ extension Component {
       text = formattedText(input: originalText, ignoreStringFormatting: ignoreStringFormatting)
     }
 
+    if svg?.errorText == nil, imageContainer != nil, let label = ellAccessibilityLabel {
+      return text.accessibilityLabel(Text(verbatim: label))
+    }
     return text
   }
 

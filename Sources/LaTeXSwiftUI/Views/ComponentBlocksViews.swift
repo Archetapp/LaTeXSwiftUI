@@ -94,9 +94,7 @@ internal struct ComponentBlocksViews: View {
                 }
               }
               else {
-                HorizontalImageScroller(
-                  image: container.image,
-                  size: container.size.size)
+                equationImage(container: container, component: block.components.first)
                   .frame(maxWidth: .infinity)
               }
 
@@ -121,6 +119,16 @@ internal struct ComponentBlocksViews: View {
           }
         }
       }
+    }
+  }
+
+  @ViewBuilder
+  private func equationImage(container: ImageContainer, component: Component?) -> some View {
+    let image = HorizontalImageScroller(image: container.image, size: container.size.size)
+    if component?.svg?.errorText == nil, let label = component?.ellAccessibilityLabel {
+      image.accessibilityLabel(Text(verbatim: label))
+    } else {
+      image
     }
   }
 

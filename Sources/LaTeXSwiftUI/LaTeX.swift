@@ -89,6 +89,7 @@ public struct LaTeX: View {
 
   @StateObject private var renderer = Renderer()
   @State private var preloadTask: Task<(), Never>?
+  @State private var renderTask: Task<(), Never>?
   @State private var renderInvalidationKey: RenderInvalidationKey?
 
   // MARK: Initializers
@@ -110,14 +111,7 @@ public struct LaTeX: View {
         } else if isCached() {
           bodyWithBlocks(renderSync())
         } else {
-          switch renderingStyle {
-          case .empty, .original, .redactedOriginal, .progress:
-            loadingView().task {
-              await renderAsync()
-            }
-          case .wait:
-            bodyWithBlocks(renderSync())
-          }
+          loadingView()
         }
       }
 
@@ -133,12 +127,17 @@ public struct LaTeX: View {
       }
     }
     .animation(renderingAnimation, value: renderer.rendered)
-    .onDisappear(perform: preloadTask?.cancel)
+    .onDisappear {
+      preloadTask?.cancel()
+      renderTask?.cancel()
+    }
     .onAppear {
       invalidateRendererIfNeeded()
+      ensureRendering()
     }
     .onChange(of: currentRenderInvalidationKey) { _ in
       invalidateRendererIfNeeded()
+      ensureRendering()
     }
     #if os(macOS)
       .fixedSize(horizontal: false, vertical: true)
@@ -228,9 +227,28 @@ extension LaTeX {
     renderer.invalidateRenderState()
   }
 
-  /// Checks the renderer's caches for the current view.
+  /// Drives rendering from a lifecycle-stable, unstructured `Task` rather than
+  /// a `.task(id:)` modifier.
+  ///
+  /// SwiftUI cancels `.task` work whenever its host view is torn down during
+  /// layout probing (`ViewThatFits`, `fixedSize`, AppKit-hosted editors). When
+  /// that happens on a view whose invalidation key never changes again, the
+  /// render never re-fires and the equation stays in its loading state until an
+  /// unrelated edit forces a new key. An unstructured `Task` is only cancelled
+  /// on disappear or key change, so transient layout churn cannot strand it.
+  @MainActor private func ensureRendering() {
+    guard !renderer.rendered && !renderer.syncRendered else { return }
+    renderTask?.cancel()
+    renderTask = Task { await renderAsync() }
+  }
+
+  /// Whether the view's components are already present in the shared cache.
+  ///
+  /// When `true`, `renderSync()` can produce the rendered blocks on the first
+  /// body evaluation without an asynchronous hop, so already-cached content
+  /// paints immediately instead of showing the loading view for a frame.
   private func isCached() -> Bool {
-    return renderer.isCached(
+    renderer.isCached(
       latex: latex,
       unencodeHTML: unencodeHTML,
       parsingMode: parsingMode,
@@ -240,9 +258,13 @@ extension LaTeX {
       displayScale: resolvedDisplayScale)
   }
 
-  /// Renders the view's components asynchronously.
-  private func renderAsync() async {
-    await renderer.render(
+  /// Renders the view's components synchronously from cached data.
+  ///
+  /// Only used behind an `isCached()` guard, so the work is cache reads plus
+  /// image wrapping — the expensive MathJax conversion never runs on the main
+  /// thread here.
+  @MainActor private func renderSync() -> [ComponentBlock] {
+    renderer.renderSync(
       latex: latex,
       unencodeHTML: unencodeHTML,
       parsingMode: parsingMode,
@@ -253,11 +275,9 @@ extension LaTeX {
       renderingMode: imageRenderingMode)
   }
 
-  /// Renders the view's components synchronously.
-  ///
-  /// - Returns: The rendered components.
-  private func renderSync() -> [ComponentBlock] {
-    return renderer.renderSync(
+  /// Renders the view's components asynchronously.
+  private func renderAsync() async {
+    await renderer.render(
       latex: latex,
       unencodeHTML: unencodeHTML,
       parsingMode: parsingMode,
@@ -296,8 +316,8 @@ extension LaTeX {
       Text(latex).redacted(reason: .placeholder)
     case .progress:
       ProgressView()
-    default:
-      EmptyView()
+    case .wait:
+      Text(latex)
     }
   }
 

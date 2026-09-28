@@ -166,4 +166,29 @@ struct ParserBlockTests {
         #expect(types.contains(.blockEquation))
         #expect(types.contains(.namedEquation))
     }
+
+    // MARK: - Superscript With Plus In Exponent
+
+    @Test("Block TeX equation with a superscript containing a plus parses as one texEquation with content intact")
+    func texEquationSuperscriptWithPlusInExponent() {
+        let input = "$$(1 - x)(1 + x + \\cdots + x^n) = 1 - x^{n+1}$$"
+        let components = Parser.parse(input)
+        #expect(components.count == 1)
+        #expect(components[0].type == .texEquation)
+        #expect(components[0].text == "(1 - x)(1 + x + \\cdots + x^n) = 1 - x^{n+1}")
+    }
+
+    @Test("Incremental typing of x^{n+1} keeps the equation a single texEquation at every keystroke")
+    func texEquationSuperscriptIncrementalTyping() {
+        let states = [
+            "$$x^{n}$$",
+            "$$x^{n+}$$",
+            "$$x^{n+1}$$"
+        ]
+        for state in states {
+            let components = Parser.parse(state)
+            #expect(components.count == 1, "Expected a single component for \(state)")
+            #expect(components[0].type == .texEquation, "Expected texEquation for \(state)")
+        }
+    }
 }

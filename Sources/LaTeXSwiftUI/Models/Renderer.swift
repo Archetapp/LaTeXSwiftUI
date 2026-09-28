@@ -65,6 +65,14 @@ internal class Renderer: ObservableObject {
   /// Whether or not the receiver is currently rendering.
   @MainActor var isRendering: Bool = false
 
+  /// Monotonic token identifying the most recently requested render.
+  ///
+  /// Each render captures the generation at launch and only commits its result
+  /// (or mutates shared state on cancellation) while it is still current. This
+  /// lets a superseding render proceed without being stranded by a prior
+  /// render's not-yet-cleared `isRendering` flag.
+  @MainActor var renderGeneration: Int = 0
+
   /// The rendered blocks.
   @MainActor var blocks: [ComponentBlock] = []
 
@@ -72,19 +80,6 @@ internal class Renderer: ObservableObject {
 
   /// The LaTeX input's parsed blocks.
   private var _parsedBlocks: [ComponentBlock]? = nil
-  private var parsedBlocks: [ComponentBlock]? {
-    get {
-      parsedBlocksQueue.sync { [weak self] in
-        return self?._parsedBlocks
-      }
-    }
-
-    set {
-      parsedBlocksQueue.async(flags: .barrier) { [weak self] in
-        self?._parsedBlocks = newValue
-      }
-    }
-  }
 
   /// The set of values used to create the parsed blocks.
   private var _parsingSource: ParsingSource? = nil
@@ -104,6 +99,7 @@ extension Renderer {
     syncRendered = false
     isRendering = false
     blocks = []
+    renderGeneration += 1
 
     parsedBlocksQueue.sync(flags: .barrier) {
       _parsedBlocks = nil
@@ -201,28 +197,43 @@ extension Renderer {
     displayScale: CGFloat,
     renderingMode: SwiftUI.Image.TemplateRenderingMode
   ) async {
-    let isRen = await isRendering
-    let ren = await rendered
-    let renSync = await syncRendered
-    guard !isRen && !ren && !renSync else {
-      return
-    }
-    await MainActor.run {
+    let generation: Int? = await MainActor.run {
+      guard !rendered && !syncRendered else {
+        return nil
+      }
+      renderGeneration += 1
       isRendering = true
+      return renderGeneration
     }
+    guard let generation else { return }
 
-    let texOptions = TeXInputProcessorOptions(processEscapes: processEscapes, errorMode: errorMode)
-    let renderedBlocks = render(
-      blocks: parseBlocks(latex: latex, unencodeHTML: unencodeHTML, parsingMode: parsingMode),
-      xHeight: xHeight,
-      displayScale: displayScale,
-      renderingMode: renderingMode,
-      texOptions: texOptions)
+    do {
+      try Task.checkCancellation()
+      let texOptions = TeXInputProcessorOptions(processEscapes: processEscapes, errorMode: errorMode)
+      let parsedBlocks = parseBlocks(latex: latex, unencodeHTML: unencodeHTML, parsingMode: parsingMode)
+      try Task.checkCancellation()
+      let renderedBlocks = render(
+        blocks: parsedBlocks,
+        xHeight: xHeight,
+        displayScale: displayScale,
+        renderingMode: renderingMode,
+        texOptions: texOptions)
+      try Task.checkCancellation()
 
-    await MainActor.run {
-      blocks = renderedBlocks
-      isRendering = false
-      rendered = true
+      await MainActor.run {
+        guard generation == renderGeneration else { return }
+        blocks = renderedBlocks
+        isRendering = false
+        rendered = true
+      }
+    } catch is CancellationError {
+      await MainActor.run {
+        if generation == renderGeneration { isRendering = false }
+      }
+    } catch {
+      await MainActor.run {
+        if generation == renderGeneration { isRendering = false }
+      }
     }
   }
 
@@ -246,13 +257,17 @@ extension Renderer {
     parsingMode: LaTeX.ParsingMode
   ) -> [ComponentBlock] {
     let currentSource = ParsingSource(latex: latex, unencodeHTML: unencodeHTML, parsingMode: parsingMode)
-    if let parsedBlocks, _parsingSource == currentSource {
-      return parsedBlocks
+    if let cachedBlocks = parsedBlocksQueue.sync(execute: {
+      _parsingSource == currentSource ? _parsedBlocks : nil
+    }) {
+      return cachedBlocks
     }
 
     let blocks = Parser.parse(unencodeHTML ? latex.htmlUnescape() : latex, mode: parsingMode)
-    parsedBlocks = blocks
-    _parsingSource = currentSource
+    parsedBlocksQueue.sync(flags: .barrier) {
+      _parsedBlocks = blocks
+      _parsingSource = currentSource
+    }
     return blocks
   }
 

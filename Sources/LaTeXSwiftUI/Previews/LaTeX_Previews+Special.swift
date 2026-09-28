@@ -53,6 +53,15 @@ struct LaTeX_Previews_Special: PreviewProvider {
         .ignoreStringFormatting()
     }
     .previewDisplayName("Escaped Characters")
+
+    VStack(spacing: 16) {
+      LaTeX(#"A rectangle has perimeter $52 = 2\ell + 2w$ and length $\ell = 8$."#)
+      LaTeX(#"$$52 = 2\ell + 2w$$"#)
+      LaTeX(#"$$\ell = 8$$"#)
+      LaTeX(#"So $w = 18$. Scripts: $\ell^2$, $\ell_1$, $\ell_{1}^{2}$."#)
+      LaTeX(#"Compare $l$, $1$, and $\ell$."#)
+    }
+    .previewDisplayName("Script lowercase ell")
   }
   
 }

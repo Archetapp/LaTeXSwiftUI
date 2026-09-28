@@ -273,7 +273,11 @@ extension Renderer {
       throw RenderingError.mathJaxUnavailable
     }
 
-    let texInput = Self.normalizeNumericBaseExponentsForMathJax(component.text)
+    let texInput = Self.insertSpaceBeforeDigitScriptBrace(
+      Self.normalizeNumericBaseExponentsForMathJax(component.text))
+
+    Self.logTeXBoundary(rawText: component.text, texInput: texInput, phase: "request")
+
     var conversionError: Error?
     let svgString = MathJax.renderQueue.sync {
       mathjax.tex2svg(
@@ -285,7 +289,19 @@ extension Renderer {
     }
 
     let errorText = try getErrorText(from: conversionError)
+
+    if let firstError = errorText {
+      Self.logTeXBoundary(
+        rawText: component.text,
+        texInput: texInput,
+        phase: "MathJax error: \(firstError)")
+    }
+
     let svg = try SVG(svgString: svgString, errorText: errorText)
+
+    if errorText != nil {
+      return svg
+    }
 
     do {
       Cache.shared.setDataCacheValue(try svg.encoded(), for: cacheKey)
@@ -294,6 +310,73 @@ extension Renderer {
     }
 
     return svg
+  }
+
+  /// Inserts a space before a `}` that closes a superscript or subscript group
+  /// (`^{…}` / `_{…}`) when the group's last character is a digit.
+  ///
+  /// Some MathJax builds reject a digit immediately followed by the closing
+  /// brace of a script group — e.g. `x^{n+1}` fails with "Extra open brace or
+  /// missing close brace" while `x^{n+1 }` renders correctly. A trailing space
+  /// inside a math-mode group is semantically inert, so this rewrite is safe.
+  /// It is deliberately scoped to script groups: braces opened by commands such
+  /// as `\textcolor{#ff3b30}` are left untouched so hex color arguments are not
+  /// disturbed.
+  ///
+  /// - Parameter text: The TeX input.
+  /// - Returns: The TeX input with spaces inserted before digit-terminated
+  ///   script-group closing braces.
+  static func insertSpaceBeforeDigitScriptBrace(_ text: String) -> String {
+    var result = ""
+    result.reserveCapacity(text.count + 4)
+
+    var braceIsScript: [Bool] = []
+    var lastSignificant: Character? = nil
+    var index = text.startIndex
+
+    while index < text.endIndex {
+      let char = text[index]
+      let next = text.index(after: index)
+
+      if char == "\\" {
+        result.append(char)
+        if next < text.endIndex {
+          result.append(text[next])
+          lastSignificant = text[next]
+          index = text.index(after: next)
+        } else {
+          index = next
+        }
+        continue
+      }
+
+      if char == "{" {
+        braceIsScript.append(lastSignificant == "^" || lastSignificant == "_")
+        result.append(char)
+        lastSignificant = char
+        index = next
+        continue
+      }
+
+      if char == "}" {
+        let isScript = braceIsScript.popLast() ?? false
+        if isScript, let last = lastSignificant, last.isNumber {
+          result.append(" ")
+        }
+        result.append(char)
+        lastSignificant = char
+        index = next
+        continue
+      }
+
+      result.append(char)
+      if !char.isWhitespace {
+        lastSignificant = char
+      }
+      index = next
+    }
+
+    return result
   }
 
   /// MathJaxSwift's bridge can leave the caret visible when a numeric atom is
@@ -549,6 +632,77 @@ extension Renderer {
         .interpolation(.high)
     }
   #endif
+
+  /// Lock guarding `recentTeXInputs`.
+  private static let texHistoryLock = NSLock()
+
+  /// A ring buffer of the most recent TeX inputs handed to MathJax, used to
+  /// dump the render sequence preceding an error.
+  private static var recentTeXInputs: [String] = []
+
+  /// The maximum number of recent TeX inputs to retain for error diagnostics.
+  private static let maxRecentTeXInputs = 40
+
+  /// Records a TeX input into the recent-history ring buffer.
+  private static func recordTeXInput(_ texInput: String) {
+    texHistoryLock.lock()
+    defer { texHistoryLock.unlock() }
+    recentTeXInputs.append(texInput)
+    if recentTeXInputs.count > maxRecentTeXInputs {
+      recentTeXInputs.removeFirst(recentTeXInputs.count - maxRecentTeXInputs)
+    }
+  }
+
+  /// Returns a snapshot of the recent TeX input history, oldest first.
+  private static func recentTeXHistorySnapshot() -> [String] {
+    texHistoryLock.lock()
+    defer { texHistoryLock.unlock() }
+    return recentTeXInputs
+  }
+
+  /// Emits a diagnostic log line describing the exact TeX handed to MathJax.
+  ///
+  /// Logs the raw component text, the normalized TeX input, and the running
+  /// balance of `{}` braces and `$` delimiters so brace-mismatch errors (e.g.
+  /// "Extra open brace or missing close brace") can be traced to the exact
+  /// string MathJax received. On the error phase it also dumps the recent
+  /// sequence of TeX inputs, since the same balanced string renders fine in
+  /// isolation — the trigger is the render sequence / accumulated MathJax
+  /// instance state, not the string alone. Intended to stay in place for
+  /// ongoing debugging of markdown/LaTeX rendering issues in Brainblast Admin.
+  ///
+  /// - Parameters:
+  ///   - rawText: The component's text before normalization.
+  ///   - texInput: The normalized TeX string passed to MathJax.
+  ///   - phase: A label describing the log point (e.g. "request" or an error).
+  static func logTeXBoundary(rawText: String, texInput: String, phase: String) {
+    let openBraces = texInput.filter { $0 == "{" }.count
+    let closeBraces = texInput.filter { $0 == "}" }.count
+    let dollars = texInput.filter { $0 == "$" }.count
+    let braceBalanced = openBraces == closeBraces
+    let isError = phase.hasPrefix("MathJax error")
+
+    if phase == "request" {
+      recordTeXInput(texInput)
+    }
+
+    var message = """
+      LaTeXSwiftUI[TeX] \(phase)
+        raw : \(rawText.debugDescription)
+        tex : \(texInput.debugDescription)
+        braces: open=\(openBraces) close=\(closeBraces) balanced=\(braceBalanced) | dollars=\(dollars)
+      """
+
+    if isError {
+      let history = recentTeXHistorySnapshot()
+      let dump = history.enumerated()
+        .map { "    [\($0.offset)] \($0.element.debugDescription)" }
+        .joined(separator: "\n")
+      message += "\n  --- recent TeX inputs (oldest first, replay to reproduce) ---\n\(dump)"
+    }
+
+    NSLog(message)
+  }
 
   /// Gets the error text from a possibly non-nil error.
   ///

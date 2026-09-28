@@ -208,7 +208,7 @@ extension View {
   /// - Fixed display scale for consistent rendering
   /// - Equation-only parsing mode
   /// - Block views rendering mode
-  /// - Synchronous rendering (wait mode)
+  /// - Nonblocking original-text fallback rendering
   /// - Center block alignment
   ///
   /// - Parameters:
@@ -226,7 +226,7 @@ extension View {
       .fixedDisplayScale(fixedDisplayScale)
       .parsingMode(.onlyEquations)
       .blockMode(.blockViews)
-      .renderingStyle(.wait)
+      .renderingStyle(.original)
       .blockAlignment(blockAlignment)
   }
 }

@@ -42,11 +42,12 @@ extension CacheKey {
   /// The key to use in the cache.
   internal func key() -> String {
     do {
-      let data = try JSONEncoder().encode(self)
+      let encoder = JSONEncoder()
+      encoder.outputFormatting = [.sortedKeys]
+      let data = try encoder.encode(self)
       let hashedData = SHA256.hash(data: data)
       return hashedData.compactMap { String(format: "%02x", $0) }.joined() + "-" + Self.keyType
-    }
-    catch {
+    } catch {
       return fallbackKey + "-" + Self.keyType
     }
   }
@@ -166,9 +167,12 @@ extension Cache {
   func setImageCacheValue(_ value: _Image, for key: ImageCacheKey) {
     let cacheKey = key.key()
     #if os(iOS) || os(visionOS)
-    let cost = Int(value.size.width * value.size.height * value.scale * CGFloat(Constants.bytesPerPixelMultiplier))
+      let cost = Int(
+        value.size.width * value.size.height * value.scale
+          * CGFloat(Constants.bytesPerPixelMultiplier))
     #else
-    let cost = Int(value.size.width * value.size.height * CGFloat(Constants.bytesPerPixelMultiplier))
+      let cost = Int(
+        value.size.width * value.size.height * CGFloat(Constants.bytesPerPixelMultiplier))
     #endif
     imageCacheQueue.async(flags: .barrier) { [weak self] in
       guard let self = self else { return }

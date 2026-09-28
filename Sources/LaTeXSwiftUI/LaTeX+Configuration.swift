@@ -103,7 +103,8 @@ extension LaTeX {
     /// The view displays a progress view until it's finished rendering.
     case progress
 
-    /// The view blocks on the main thread until it's finished rendering.
+    /// Compatibility mode. Displays the original input while rendering
+    /// completes asynchronously.
     case wait
   }
 
@@ -155,7 +156,7 @@ extension LaTeX {
   /// - Fixed display scale for consistent rendering
   /// - Equation-only parsing mode
   /// - Block views rendering mode
-  /// - Synchronous rendering (wait mode)
+  /// - Nonblocking original-text fallback rendering
   /// - Custom block alignment
   ///
   /// - Parameters:
@@ -176,7 +177,7 @@ extension LaTeX {
       .fixedDisplayScale(fixedDisplayScale)
       .parsingMode(.onlyEquations)
       .blockMode(.blockViews)
-      .renderingStyle(.wait)
+      .renderingStyle(.original)
       .blockAlignment(latexBlockAlignment)
   }
 
@@ -201,7 +202,7 @@ extension LaTeX {
         .fixedDisplayScale(fixedDisplayScale)
         .parsingMode(.onlyEquations)
         .blockMode(.blockViews)
-        .renderingStyle(.wait)
+        .renderingStyle(.original)
         .blockAlignment(latexBlockAlignment)
     }
   #else
@@ -225,7 +226,7 @@ extension LaTeX {
         .fixedDisplayScale(fixedDisplayScale)
         .parsingMode(.onlyEquations)
         .blockMode(.blockViews)
-        .renderingStyle(.wait)
+        .renderingStyle(.original)
         .blockAlignment(latexBlockAlignment)
     }
   #endif
